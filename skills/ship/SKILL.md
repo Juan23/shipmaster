@@ -47,12 +47,14 @@ Done when a round is clean.
 
 ## 5. Merge
 
-The PR is **green** when every one of these holds, read from `gh pr view --json state,isDraft,mergeable,headRefOid,comments`:
+The PR is **green** when every one of these holds, read from `gh pr view --json state,isDraft,mergeable,headRefOid,comments`, `gh issue view <n> --json comments` and the checkout:
 
 - it is open, not a draft, and not `CONFLICTING`;
 - the local `HEAD` is its `headRefOid` and contains the latest default branch (after `git fetch`, `git merge-base --is-ancestor origin/<default> HEAD`);
 - the latest checks comment names the tree of that commit;
-- the latest review comment reads `clean on` that `headRefOid`, or on an earlier head with the identical change (the same `git diff origin/<default>...<sha> | git patch-id --verbatim`).
+- the latest review comment reads `clean on` that `headRefOid`, or on an earlier head with the identical change (the same `git diff origin/<default>...<sha> | git patch-id --verbatim`);
+- every departure from an acceptance line carries the user's approval, recorded on the issue or PR. A departure is any place where what you built or checked differs from what the line names (another control, screen, route or check). A reviewer's acceptance is not the user's: ask the user about any other departure, as in step 1, before you call the PR green;
+- every evidence file the PR or issue cites is committed or lives outside the checkout. Copy one that sits only in an ignored or untracked folder to where the repo's instructions keep evidence (or `~/ship-evidence/<repo>/<n>/` where they name no place), and cite the copy, because a worktree is removed after the merge.
 
 When the branch is behind or `CONFLICTING`, merge `origin/<default>` into it, resolving conflicts by the repo's rules, run the full checks, push and post a new checks comment; run a new review round only when the change is no longer identical.
 
@@ -60,4 +62,4 @@ Merge only a green PR, and only the commit you checked, with the repo's own merg
 
 Done when the PR shows `MERGED`, the issue shows `CLOSED` (close it yourself when the PR body did not, or leave it open with a comment naming what remains where the repo's closing rules say so), and the checkout is detached at the updated `origin/<default>`, since another worktree may hold the default branch.
 
-Report the merged PR, the number of rounds, and the non-blocking notes from the last review.
+Report the merged PR, the number of rounds, where its evidence is kept, and the non-blocking notes from the last review.
