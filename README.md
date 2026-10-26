@@ -34,29 +34,30 @@ In Claude Code, from a checkout of the repo the issues belong to:
 
 ## worker-routing
 
-Before dispatching a worker, `perf.py route` names the cheapest tier with a good record for that type of task at that complexity. After the worker finishes, `perf.py add` records the outcome. If accepted work later needs another build or test cycle, `perf.py rework` marks it, and that tier ranks lower next time.
+Before dispatching a worker, `perf.py route` picks its tier. It starts from a tier set by the task's complexity, drops to a cheaper tier the log has proven on similar tasks, and skips tiers the log shows doing badly. With an empty log it returns the starting tier. After the worker finishes, `perf.py add` records the outcome. If accepted work later needs another build or test cycle, `perf.py rework` marks it, and that tier ranks lower next time.
 
 ```bash
 python3 ~/.claude/skills/worker-routing/perf.py route --type coding --complexity 3
 python3 ~/.claude/skills/worker-routing/perf.py stats
 ```
 
-The tiers, cheapest first, are `haiku-medium`, `haiku-high`, `sonnet-high`, `opus-low` and `opus-medium`. `opus-high` (Opus 5.5, high effort) does every PR review and is never routed to. They are subagent definitions in `agents/`. `SKILL.md` has the full routing rules.
+The tiers, cheapest first, are `haiku-medium`, `haiku-high`, `sonnet-high`, `opus-low` and `opus-medium`. `opus-high` (Opus 5.5, high effort) does every PR review and is never routed to. They are subagent definitions in `agents/`. `skills/worker-routing/SKILL.md` has the full routing rules.
 
-The log has one JSON line per worker and is shared by every project on the machine: `~/.claude/skills/worker-routing/agent-performance-log.jsonl`. It never goes in this repo, and `.gitignore` blocks it if it ends up here.
+The log has one JSON line per worker and per rework, and is shared by every project on the machine: `~/.claude/skills/worker-routing/agent-performance-log.jsonl`. It never goes in this repo, and `.gitignore` blocks it if it ends up here.
 
 ## Install
 
 ```bash
 git clone https://github.com/Juan23/shipmaster ~/Projects/shipmaster
+mkdir -p ~/.claude/skills/worker-routing ~/.claude/agents
 ln -s ~/Projects/shipmaster/skills/ship ~/.claude/skills/ship
 ln -s ~/Projects/shipmaster/skills/shipmaster ~/.claude/skills/shipmaster
-mkdir -p ~/.claude/skills/worker-routing ~/.claude/agents
 ln -s ~/Projects/shipmaster/skills/worker-routing/{SKILL.md,perf.py} ~/.claude/skills/worker-routing/
 ln -s ~/Projects/shipmaster/agents/*.md ~/.claude/agents/
+touch ~/.claude/skills/worker-routing/agent-performance-log.jsonl
 ```
 
-The links keep the installed skills on the checkout, so `git pull` updates them. worker-routing links its two files instead of the folder, so the log stays in `~/.claude/skills/worker-routing/` and out of the checkout. On a new machine, the first `perf.py add` needs `--init` to create the log.
+The links keep the installed skills on the checkout, so `git pull` updates them. The worker-routing install links its two files instead of the folder, so the log stays in `~/.claude/skills/worker-routing/` and out of the checkout. `touch` creates an empty log on a new machine and leaves an existing one alone. If that folder already has its own `SKILL.md` and `perf.py`, delete those two first; keep the log.
 
 You also need:
 
