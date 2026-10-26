@@ -1,6 +1,6 @@
 ---
 name: ship
-description: "Take one GitHub issue to main: build it, open a PR, run fresh-reviewer rounds until green, merge."
+description: "Take one GitHub issue to main: build it, check it against the issue, open a PR, run fresh-reviewer rounds until green, merge."
 disable-model-invocation: true
 ---
 
@@ -20,11 +20,13 @@ Done when you are on the ticket branch with the acceptance criteria in hand.
 
 Call the Skill tool with `tdd`. Where `tdd` says to confirm the seams with the user, take your recommended seams as confirmed: write each one down with its one-line note and carry on. Run type checks and single test files as you go, then the full checks. Commit to the ticket branch.
 
-Done when every acceptance criterion is met, the full checks pass, and the tree is clean.
+Before the PR, review your own work against the issue: call the Skill tool with `code-review`, giving it the fixed point `origin/<default>` and the issue as the spec. Fix each Spec finding and each Standards violation that changes behaviour, safety, security or data and survives code-review's Verify step; the rest are notes. Run the full checks again and commit.
+
+Done when every acceptance criterion is met, code-review has nothing left to fix, the full checks pass, and the tree is clean.
 
 ## 3. Open the PR
 
-Push the branch and open the PR against the default branch with `gh pr create`: the issue's title, and a body whose first line is `Closes #<n>`, or the first line the repo's instructions require instead (such as `Part of #<n>`), then a short summary (what changed, the seams under test, how it was verified). Post the pass with `gh pr comment`, first line exactly `Checks passed on tree <tree>`, then the commands you ran.
+Push the branch and open the PR against the default branch with `gh pr create`: the issue's title, and a body whose first line is `Closes #<n>`, or the first line the repo's instructions require instead (such as `Part of #<n>`), then a short summary (what changed, the seams under test, how it was verified, and what code-review found and how you settled it). Post the pass with `gh pr comment`, first line exactly `Checks passed on tree <tree>`, then the commands you ran.
 
 Done when the PR is open with its checks comment.
 
@@ -41,7 +43,7 @@ After five rounds with no clean one, stop and ask the user, listing the open fin
 
 Reviewer brief, brackets filled:
 
-> Review PR [url] for issue [ref], in [repo path], which is checked out at the PR head. Call the Skill tool with `code-review`, giving it the fixed point `origin/[default branch]` and issue [ref] as the spec. A **blocking** finding is a Spec finding, or a Standards violation that changes behaviour, safety, security or data, that survives its verification step. Wording, naming, comment accuracy and judgement-call smells are notes and never block; a missing check result is not a finding either, since the merge gate checks evidence. Read the earlier rounds and replies (`gh pr view --comments`) first: a finding answered there with evidence stays answered unless the code proves the answer wrong. Post the code-review report with `gh pr comment`, first line exactly `Review round [N]: clean on <sha>` when nothing blocks, otherwise `Review round [N]: changes on <sha>`, where `<sha>` is the PR's full `headRefOid`, and include the lines `Reviewed-SHA: <sha>` and `Verdict: clean` (or `Verdict: findings`) on their own, which merge gates read. Leave the code exactly as it is. Reply with the verdict and the blocking findings.
+> Review PR [url] for issue [ref], in [repo path], which is checked out at the PR head. Read the issue and the earlier rounds and replies (`gh pr view --comments`) first: a finding answered there with evidence stays answered unless the code proves the answer wrong. Then call the Skill tool with `ponytail:ponytail-review` on the changes since `origin/[default branch]`. A **blocking** finding is a **Must fix** the change causes, in code it adds or alters or in a caller it breaks, that survives ponytail's "Check before you report". A Must fix that was already there before the change, **Should fix** and **Nice to have** are notes and never block; a missing check result is not a finding either, since the merge gate checks evidence. Post the report with `gh pr comment`, without ponytail's own `Verdict:` line, first line exactly `Review round [N]: clean on <sha>` when nothing blocks, otherwise `Review round [N]: changes on <sha>`, where `<sha>` is the PR's full `headRefOid`, and include the lines `Reviewed-SHA: <sha>` and `Verdict: clean` (or `Verdict: findings`) on their own, which merge gates read. Leave the code exactly as it is. Reply with the verdict and the blocking findings.
 
 Done when a round is clean.
 
