@@ -45,7 +45,7 @@ To **resume** a ship, write the message to the next `<k>.msg` and run the same c
 On every wake and every user message, rebuild the state from GitHub and `ships/`; they hold everything, so nothing depends on your memory of earlier turns. A ship's reply is the `result` field of the `"type":"result"` line in its latest `<k>.log` (`grep '"type":"result"' <log> | tail -1`). Give each ship the first state that matches:
 
 1. **working**: `pgrep -f <its latest log>` finds its command.
-2. **merged**: `gh pr list --head <branch> --state merged` finds its PR. Remove its worktree with `git worktree remove <path>`, which also deletes ignored files. A worktree that is dirty, or holds a file the ship's last reply names, stays, and you report it.
+2. **merged**: `gh pr list --head <branch> --state merged` finds its PR. Remove its worktree with `git worktree remove <path>` to free the disk: its commits are on the default branch, and ship copies its evidence out before merging. Only a dirty worktree stays, since uncommitted edits are on no branch; report it.
 3. **waiting**: its reply ends with `waiting on the user: <question>`. Pass the question to the user word for word, with the issue, once per log. Resume the ship with their answer as they wrote it.
 4. **ready**: its reply says `ready to merge`.
 5. **needs the baton**: its reply ends with `needs the baton: <the run>`.
@@ -61,4 +61,4 @@ When no ship is live and none can launch, go to step 4. Otherwise end your turn.
 
 ## 4. Report
 
-One line per issue: merged (its PR, and why its worktree was kept, if it was), stuck (its blocker), stopped (its reason), or waiting (its question). The user can open any idle ship with `claude --resume <uuid>` from its worktree.
+One line per issue: merged (its PR, and its worktree if it stayed dirty), stuck (its blocker), stopped (its reason), or waiting (its question). The user can open any idle ship with `claude --resume <uuid>` from its worktree.
