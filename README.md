@@ -50,14 +50,14 @@ The log has one JSON line per worker and per rework, and is shared by every proj
 ```bash
 git clone https://github.com/Juan23/shipmaster ~/Projects/shipmaster
 mkdir -p ~/.claude/skills/worker-routing ~/.claude/agents
-ln -s ~/Projects/shipmaster/skills/ship ~/.claude/skills/ship
-ln -s ~/Projects/shipmaster/skills/shipmaster ~/.claude/skills/shipmaster
-ln -s ~/Projects/shipmaster/skills/worker-routing/{SKILL.md,perf.py} ~/.claude/skills/worker-routing/
-ln -s ~/Projects/shipmaster/agents/*.md ~/.claude/agents/
+ln -sfn ~/Projects/shipmaster/skills/ship ~/.claude/skills/ship
+ln -sfn ~/Projects/shipmaster/skills/shipmaster ~/.claude/skills/shipmaster
+ln -sf ~/Projects/shipmaster/skills/worker-routing/{SKILL.md,perf.py} ~/.claude/skills/worker-routing/
+ln -sf ~/Projects/shipmaster/agents/*.md ~/.claude/agents/
 touch ~/.claude/skills/worker-routing/agent-performance-log.jsonl
 ```
 
-The links keep the installed skills on the checkout, so `git pull` updates them. The worker-routing install links its two files instead of the folder, so the log stays in `~/.claude/skills/worker-routing/` and out of the checkout. `touch` creates an empty log on a new machine and leaves an existing one alone. If that folder already has its own `SKILL.md` and `perf.py`, delete those two first; keep the log.
+The links keep the installed skills on the checkout, so `git pull` updates them. The worker-routing install links its two files instead of the folder, so the log stays in `~/.claude/skills/worker-routing/` and out of the checkout. `touch` creates an empty log on a new machine and leaves an existing one alone. Running the block again is safe: it replaces old copies or links with links to this checkout.
 
 You also need:
 
