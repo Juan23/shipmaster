@@ -1,0 +1,5 @@
+interface:
+  display_name: "Ship"
+  short_description: "Take one issue to merged on main"
+policy:
+  allow_implicit_invocation: false
