@@ -13,6 +13,8 @@ The arguments hold the issues (numbers, `owner/repo#n` or URLs, all in this chec
 
 A ship is **live** from its start until it merges or stops; one waiting on the user is live. Ships run in auto permission mode, so run this only from a session in auto mode; otherwise stop and say so.
 
+**Ship default.** Every ship turn runs on the model and effort in `~/.claude/shipmaster-defaults` on this machine (`model=<id>` and `effort=<level>` lines, which `run-ship.sh` reads), and on Opus 5.5 at medium where the file names none; your own model does not carry over. When the arguments set the default instead of naming issues ("set default to sonnet 5.5 high"), write that file with the model's full id (Opus 5.5 is `claude-opus-5-5`) and an effort of low, medium, high, xhigh or max, keeping the current effort when the user names none. Read it back, report the model and effort and that the setting is for this machine only, and stop. Running ships pick it up on their next turn.
+
 ## 1. Plan
 
 For each issue read `gh issue view <n> --json number,title,state,body` and its blockers, `gh api repos/<owner>/<repo>/issues/<n>/dependencies/blocked_by --jq '.[] | {number, state}'`, plus any `Blocked by: #a, #b` line in the body. Note the issue's **open PR**, if one exists: an open PR whose body names `#<n>` (`gh pr list --state open --json number,headRefName,body`). A closed issue is reported and dropped. An issue is **unblocked** when every blocker is closed. An issue is **stuck** when a blocker is open and outside the batch, stuck itself, or has a ship that merged or stopped without closing it; report it with that blocker. Recheck this on every wake.
