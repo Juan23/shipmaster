@@ -20,6 +20,7 @@ In Claude Code, from a checkout of the repo the issues belong to:
 /shipmaster 12 13 14                   one by one
 /shipmaster 12 13 14 15 3 concurrent   three ships at a time
 /shipmaster 12 13 use worker-routing   ships build and fix through workers
+/shipmaster set default to sonnet 5.5 high   the model and effort every ship runs on
 /ship 12                               a single issue
 ```
 
@@ -31,6 +32,7 @@ In Claude Code, from a checkout of the repo the issues belong to:
 - When a ship needs an answer from you, the question appears in the shipmaster session, and your reply goes back to that ship.
 - All state is on disk in the session scratchpad (`ships/`), and the shipmaster rebuilds it from there and from GitHub on every wake.
 - A ship with no output for two hours is stopped, along with the processes it started.
+- Ships run on Opus 5.5 at medium effort unless `~/.claude/shipmaster-defaults` names another model or effort (`model=<id>`, `effort=<level>`). `/shipmaster set default to …` writes it. The file is per machine, and the shipmaster session's own model does not carry over to its ships.
 
 ## worker-routing
 
