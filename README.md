@@ -26,7 +26,7 @@ In Claude Code, from a checkout of the repo the issues belong to:
 
 ## How it works
 
-- Each ship is a headless `claude -p` session in its own git worktree, started in the background by `run-ship.sh`. When a ship's turn ends, the command exits and wakes the shipmaster.
+- Each ship is a headless `claude -p` session in its own git worktree, started in the background by `run-ship.sh`. When a ship's turn ends, the command exits and wakes the shipmaster. It also exits 15 minutes after the ship's reply when something the ship left running, such as a server, keeps its process open; the shipmaster never resumes a ship while that process is alive.
 - Blockers come from GitHub's issue dependencies, or from a `Blocked by: #n` line in the issue body. An issue that already has an open PR continues that PR on its branch.
 - With more than one ship, a **baton** lets one ship at a time merge or use a phone, emulator or Simulator, so ships never share a device or load the machine with two merge checks.
 - When a ship needs an answer from you, the question appears in the shipmaster session, and your reply goes back to that ship.
@@ -75,4 +75,4 @@ Run the shipmaster from a session in auto permission mode; its ships run in auto
 skills/shipmaster/run-ship.test.sh
 ```
 
-It runs `run-ship.sh` against a fake `claude`. It checks that arguments and exit codes pass through, and that the hang timer and a stop signal both end the ship and the processes it started.
+It runs `run-ship.sh` against a fake `claude`. It checks that arguments and exit codes pass through, that the hang timer and a stop signal both end the ship and the processes it started, and that a ship which replied and then went quiet ends the command but is left running.

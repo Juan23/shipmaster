@@ -3,6 +3,9 @@
 # Runs one headless ship turn, appending its stream-json output to <log>. A hung
 # turn would never wake the shipmaster, so it is killed after SHIP_IDLE_SECONDS
 # (default 7200) without new output, and the script exits 124.
+# A turn that has replied but whose process stays alive (a server it left running holds it
+# open) would also never wake the shipmaster, so after SHIP_DONE_SECONDS (default 900) of
+# quiet following a reply the script exits 0 and leaves that process running.
 # Job control (-m) gives the turn its own process group, so a kill also reaches
 # the tools it started, such as a merge gate or a device run.
 # Every turn runs on the ship model and effort in SHIPMASTER_DEFAULTS
@@ -11,6 +14,7 @@
 set -um
 log=$1; shift
 idle=${SHIP_IDLE_SECONDS:-7200}
+done_idle=${SHIP_DONE_SECONDS:-900}
 tick=${SHIP_TICK_SECONDS:-30}
 defaults=${SHIPMASTER_DEFAULTS:-$HOME/.claude/shipmaster-defaults}
 setting() { [ -f "$defaults" ] && sed -n "s/^$1=//p" "$defaults" | tail -1; }
@@ -27,7 +31,12 @@ stop() { kill -- -"$pid" 2>/dev/null; wait "$pid" 2>/dev/null; }
 trap 'stop; exit 143' TERM INT HUP
 while kill -0 "$pid" 2>/dev/null; do
   sleep "$tick"
-  if [ $(( $(date +%s) - $(date -r "$log" +%s) )) -ge "$idle" ]; then
+  quiet=$(( $(date +%s) - $(date -r "$log" +%s) ))
+  if [ "$quiet" -ge "$done_idle" ] && grep -q '"type":"result"' "$log"; then
+    echo "run-ship: replied, then quiet for ${done_idle}s; process $pid left running" >> "$log"
+    exit 0
+  fi
+  if [ "$quiet" -ge "$idle" ]; then
     stop
     echo "run-ship: no output for ${idle}s, stopped" >> "$log"
     exit 124
