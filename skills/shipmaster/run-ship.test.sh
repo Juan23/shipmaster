@@ -1,6 +1,7 @@
 #!/bin/bash
 # Runs run-ship.sh against a fake claude: the ship default, argument pass-through, exit codes, and
-# that the idle kill and a TERM both stop the turn and the processes it started.
+# that the idle kill and a TERM both stop the turn and the processes it started, and that a turn
+# which replied and then went quiet ends the runner but is left running.
 set -u
 dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT
 run=$(dirname "$0")/run-ship.sh
@@ -8,6 +9,7 @@ cat > "$dir/claude" <<'FAKE'
 #!/bin/bash
 echo "args: $* CLAUDECODE=${CLAUDECODE:-unset}"
 if [ -n "${FAKE_CHILD:-}" ]; then sleep 60 & echo $! > "$FAKE_CHILD"; fi
+if [ -n "${FAKE_REPLY:-}" ]; then echo '{"type":"result","result":"done"}'; echo $$ > "$FAKE_REPLY"; fi
 sleep "${FAKE_SLEEP:-0}"
 exit "${FAKE_EXIT:-0}"
 FAKE
@@ -41,6 +43,17 @@ grep -q 'run-ship: no output for 2s, stopped' "$dir/c.log" || fail "idle kill no
 sleep 1; alive "$dir/c.pid" && fail "idle kill left a child running"
 
 FAKE_SLEEP=3 SHIP_IDLE_SECONDS=10 "$run" "$dir/d.log" x; [ $? -eq 0 ] || fail "slow but under the limit"
+
+FAKE_SLEEP=3 SHIP_DONE_SECONDS=10 "$run" "$dir/j.log" x; [ $? -eq 0 ] || fail "quiet without a reply waits"
+grep -q 'run-ship: replied' "$dir/j.log" && fail "quiet without a reply ended early"
+
+start=$(date +%s)
+FAKE_REPLY="$dir/i.pid" FAKE_SLEEP=30 SHIP_DONE_SECONDS=2 "$run" "$dir/i.log" x; code=$?
+[ $code -eq 0 ] || fail "replied then quiet exit $code"
+[ $(( $(date +%s) - start )) -lt 10 ] || fail "replied then quiet too slow"
+grep -q 'run-ship: replied, then quiet for 2s' "$dir/i.log" || fail "replied then quiet note"
+alive "$dir/i.pid" || fail "replied then quiet stopped the turn"
+kill "$(cat "$dir/i.pid")"
 
 FAKE_CHILD="$dir/e.pid" FAKE_SLEEP=30 "$run" "$dir/e.log" x & runner=$!
 sleep 2; kill -TERM "$runner"; wait "$runner"; code=$?

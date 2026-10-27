@@ -46,13 +46,22 @@ To **resume** a ship, write the message to the next `<k>.msg` and run the same c
 
 On every wake and every user message, rebuild the state from GitHub and `ships/`; they hold everything, so nothing depends on your memory of earlier turns. A ship's reply is the `result` field of the `"type":"result"` line in its latest `<k>.log` (`grep '"type":"result"' <log> | tail -1`). Give each ship the first state that matches:
 
-1. **working**: `pgrep -f <its latest log>` finds its command.
+1. **working**: `pgrep -f <its latest log>` finds its command or its wake (below). That command ends 15 minutes after the ship's reply even when the ship's own process (`pgrep -f '[c]laude -p .*<uuid>'`) stays alive, held open by something it left running, such as a server; that process may still carry on with another reply once the thing it waits on ends.
 2. **waiting**: its reply ends with `waiting on the user: <question>`, even after its PR merged (a refused write after the merge asks this way). Pass the question to the user word for word, with the issue, once per log. Resume the ship with their answer as they wrote it.
-3. **merged**: `gh pr list --head <branch> --state merged` finds its PR. Remove its worktree with `git worktree remove <path>` to free the disk: its commits are on the default branch, and ship copies its evidence out before merging. Only a dirty worktree stays, since uncommitted edits are on no branch; report it.
+3. **merged**: `gh pr list --head <branch> --state merged` finds its PR. Remove its worktree with `git worktree remove <path>` to free the disk: its commits are on the default branch, and ship copies its evidence out before merging. Only a dirty worktree stays, since uncommitted edits are on no branch; report it. While the ship's process is alive, leave the worktree for a later wake.
 4. **ready**: its reply ends with `ready to merge <PR url>`.
 5. **needs the baton**: its reply ends with `needs the baton: <the run>`.
 6. **device run done**: its reply ends with `device run done: <result>`.
-7. **stopped**: anything else: no reply in the latest log, an error, five review rounds without a clean one, or a log ending `run-ship: no output`. Report its last reply.
+7. **lingering**: its process is alive and `<k>.wait` is missing or holds a different reply count than the log. It is live: start its wake.
+8. **stopped**: anything else: no reply in the latest log, an error, five review rounds without a clean one, a log ending `run-ship: no output`, or a lingering ship whose wake ran out. Report its last reply, and if its process is still alive, its pid and that `kill <pid>` stops it.
+
+**Never resume a ship whose process is alive**, since two turns of one session would then run in one worktree. Where an action below would resume it, start its wake instead and resume it when the wake ends. When its wake has already run out (`<k>.wait` holds the log's reply count), tell the user once that its process is still alive, with its pid, and that it resumes once they stop it with `kill <pid>`.
+
+**A ship's wake** ends on a new reply, on its process exiting, or after two hours. Write the log's reply count to `<k>.wait`, then run as a background command (the log path in it makes the ship count as working meanwhile):
+
+```bash
+log=<log>; n=$(grep -c '"type":"result"' "$log"); end=$((SECONDS+7200)); while pgrep -f '[c]laude -p .*<uuid>' >/dev/null && [ "$(grep -c '"type":"result"' "$log")" -eq "$n" ] && [ $SECONDS -lt $end ]; do sleep 30; done
+```
 
 Then act, in this order:
 
