@@ -2,7 +2,7 @@
 
 Claude Code skills that take GitHub issues to merged without you watching each one.
 
-- **ship** takes one issue to merged: it builds the change test-first, checks its own work against the issue and the repo's standards with `code-review`, opens a PR, runs review rounds with a fresh reviewer until one is clean, and merges. Each PR review runs `code-review` (the issue and the repo's standards) and `ponytail-review` (bugs, safety, load, missing tests, code that shouldn't be there) in one fresh reviewer.
+- **ship** takes one issue to merged: it builds the change test-first, opens a PR, runs review rounds with a fresh reviewer until one is clean, and merges. Each PR review runs `ponytail-review` (bugs, safety, load, missing tests, code that shouldn't be there) with the issue; round 1 also gives each acceptance criterion a verdict, met or not met, with its evidence. Notes that only touch wording, comments or names never block the merge.
 - **shipmaster** runs `ship` for a batch of issues, one at a time or several at once. As soon as a ship merges, it starts the next unblocked issue. It only coordinates; the ships do the work.
 - **worker-routing** picks the model and effort for each worker subagent from a log of how each tier did on earlier tasks, and adds to that log when the worker finishes. `ship` uses it in workers mode and for its reviewers.
 
@@ -65,7 +65,7 @@ You also need:
 
 - Claude Code 2.1.304 or later (for `-p`, `--session-id`, `--resume` and `stream-json` output);
 - `gh`, signed in, `git` and Python 3;
-- the `tdd` and `code-review` skills and the ponytail plugin (for `ponytail-review`), which `ship` calls.
+- the `tdd` skill and the ponytail plugin (for `ponytail-review`), which `ship` calls.
 
 Run the shipmaster from a session in auto permission mode; its ships run in auto mode too.
 
