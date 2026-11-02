@@ -82,10 +82,19 @@ def stats(rows, a):
             print(f"  {t:34}{len(v):>3} reworks, {sum(r['cycles'] for r in v)} rebuild/retest cycles, {sum(r.get('wall_min') or 0 for r in v):.0f} min")
 
 
-LADDER = ["haiku-medium", "haiku-high", "sonnet-high", "opus-low", "opus-medium"]
+LADDER = ["sonnet-medium", "sonnet-high", "opus-medium", "opus-high", "opus-xhigh"]
+HAIKU = "haiku-medium"  # below the ladder, only for the work haiku_ok allows (owner, 2026-11-02)
+RETIRED = {"haiku-high": HAIKU, "opus-low": "sonnet-high"}  # --after a worker started before 2026-11-02 steps above its equivalent
+
+
+def haiku_ok(type_, c):
+    """Work the log shows Haiku doing reliably: audits at any complexity; cleanup, merge and coding below c2.5."""
+    return type_ == "audit" or (type_ in ("cleanup", "merge", "coding") and c < 2.5)
+
+
 def floor(c):
-    """Cold-start tier index by complexity (1.0-5.0); data moves it either way."""
-    return 0 if c < 2.5 else 1 if c < 3.5 else 2
+    """Cold-start index on the ladder by complexity (1.0-5.0); data moves it either way."""
+    return 0 if c < 3.5 else 1
 
 
 def cx(s):
@@ -112,28 +121,30 @@ def route(rows, a):
     hardest ones, so a strong tier's failures say little about a cheaper tier with its own record.
     A reworked row loses 0.5: a pass that needed another build/test cycle scores like a partial."""
     rows, reworked = split(rows)
+    ladder = ([HAIKU] if haiku_ok(a.type, a.complexity) else []) + LADDER
     ev = collections.defaultdict(list)
     for r in rows:
         t = f"{r['model'].split('-')[0]}-{r['effort']}"
-        if r["type"] == a.type and r.get("blocker") != "env" and t in LADDER and abs((r.get("complexity") or 0) - a.complexity) <= 1.0:
+        if r["type"] == a.type and r.get("blocker") != "env" and t in ladder and abs((r.get("complexity") or 0) - a.complexity) <= 1.0:
             ev[t].append(r)
     val = lambda r: max({"pass": 1, "partial": 0.5}.get(r["outcome"], 0) - 0.5 * (r["task"] in reworked), 0)
     score = {t: sum(val(r) for r in v) / len(v) for t, v in ev.items()}
-    proven = [i for i, t in enumerate(LADDER) if len(ev[t]) >= 2 and score[t] >= 0.67]
-    weak = [i for i, t in enumerate(LADDER) if len(ev[t]) >= 2 and score[t] < 0.5]
-    i = floor(a.complexity)
-    why = [f"floor {LADDER[i]} for c{a.complexity}"]
+    proven = [i for i, t in enumerate(ladder) if len(ev[t]) >= 2 and score[t] >= 0.67]
+    weak = [i for i, t in enumerate(ladder) if len(ev[t]) >= 2 and score[t] < 0.5]
+    i = 0 if ladder[0] == HAIKU else floor(a.complexity)
+    why = [f"floor {ladder[i]} for c{a.complexity}"]
     if proven and min(proven) < i:
         i = min(proven)
-        why.append(f"lowered: {LADDER[i]} proven")
-    while i in weak and i < len(LADDER) - 1:
-        why.append(f"skipped {LADDER[i]}: weak")
+        why.append(f"lowered: {ladder[i]} proven")
+    while i in weak and i < len(ladder) - 1:
+        why.append(f"skipped {ladder[i]}: weak")
         i += 1
     if a.after:
-        i = min(max(i, LADDER.index(tier(a.after)) + 1), len(LADDER) - 1)
+        after = RETIRED.get(tier(a.after), tier(a.after))
+        i = min(max(i, ladder.index(after) + 1 if after in ladder else 0), len(ladder) - 1)
         why.append(f"after {tier(a.after)} stalled")
-    print(f"route: {LADDER[i]} ({'; '.join(why)})")
-    for t in LADDER:
+    print(f"route: {ladder[i]} ({'; '.join(why)})")
+    for t in ladder:
         if ev[t]:
             c = collections.Counter(r["outcome"] for r in ev[t])
             kt = [r["ktok"] for r in ev[t] if isinstance(r.get("ktok"), (int, float))]
@@ -193,7 +204,7 @@ def main():
     ro = sub.add_parser("route")
     ro.add_argument("--type", required=True, choices=TYPES)
     ro.add_argument("--complexity", required=True, type=cx)
-    ro.add_argument("--after", choices=LADDER, help="tier that just stalled on this task; route goes above it")
+    ro.add_argument("--after", choices=[HAIKU] + LADDER + list(RETIRED), help="tier that just stalled on this task; route goes above it")
     rw = sub.add_parser("rework", help="a defect found in a worker's accepted output forced another build/test cycle")
     rw.add_argument("--task", required=True, help="exact --task of the worker row that produced the defect")
     rw.add_argument("--cycles", required=True, type=int, help="extra build/test cycles the defect caused (>= 1)")

@@ -9,13 +9,13 @@ Tool: `python3 ~/.claude/skills/worker-routing/perf.py` — `route` before a dis
 
 ## Tiers
 
-Agent types in `~/.claude/agents/`, cheapest first:
-`haiku-medium` → `haiku-high` → `sonnet-high` → `opus-low` → `opus-medium`.
-`opus-high` is the PR reviewer only (rule 5), not a routing tier; `route` never returns it.
+Agent types in `~/.claude/agents/`, cheapest first (owner, 2026-11-02):
+`sonnet-medium` → `sonnet-high` → `opus-medium` → `opus-high` → `opus-xhigh`.
+`opus-high` is also the PR reviewer (rule 5).
 
-`sonnet-medium` and `haiku-xhigh` are retired (owner, 2026-10-22: weak or costly in the log); never dispatch them. Their old rows stay in `stats`.
+Haiku is dropped except for the work the log shows it doing reliably: audits (research and read-only checks) at any complexity, and cleanup, merge and simple coding below c2.5. There `route` starts at `haiku-medium`, one step below `sonnet-medium`; everywhere else it never returns Haiku.
 
-Haiku costs ~20× less per token than Sonnet, so a Haiku pass at several times the tokens is still the cheaper pass.
+Retired, never dispatched: `haiku-high`, `opus-low` (owner, 2026-11-02) and `haiku-xhigh` (2026-10-22). `sonnet-medium`, retired on 2026-10-22, is back as the lowest default. Old rows stay in `stats`.
 
 ## Dispatch
 
@@ -34,7 +34,7 @@ When a worker returns `partial`/`fail` with `blocker: model`, self-declines on s
 After **each** worker finishes, append its row before acting on the result:
 
 ```bash
-python3 ~/.claude/skills/worker-routing/perf.py add --model haiku --effort high --type coding --platform none --task "#88 capacity copy fix" --complexity 3 --outcome pass --blocker none --attempts 0 --interventions 0 --ktok 194 --note "one line: what happened and why"
+python3 ~/.claude/skills/worker-routing/perf.py add --model sonnet --effort medium --type coding --platform none --task "#88 capacity copy fix" --complexity 3 --outcome pass --blocker none --attempts 0 --interventions 0 --ktok 194 --note "one line: what happened and why"
 ```
 
 - `ktok`: exact `subagent_tokens` from the task-notification `<usage>`, in thousands.

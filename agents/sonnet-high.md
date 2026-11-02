@@ -1,6 +1,6 @@
 ---
 name: sonnet-high
-description: Sonnet worker at high effort. Escalation tier after haiku-high; next is opus-low (sparingly).
+description: Sonnet worker at high effort. Escalation tier after sonnet-medium; next is opus-medium.
 model: sonnet
 effort: high
 ---

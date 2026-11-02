@@ -1,6 +1,6 @@
 ---
 name: haiku-medium
-description: Haiku worker at medium reasoning effort — the default cheap workhorse. Orchestrators start here and escalate (haiku-medium → haiku-high → sonnet-high → opus-low → opus-medium).
+description: Haiku worker at medium reasoning effort. Only for audits and research, and cleanup, merge or simple coding below complexity 2.5; everything else starts at sonnet-medium.
 model: haiku
 effort: medium
 ---
