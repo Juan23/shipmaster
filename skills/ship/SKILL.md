@@ -1,6 +1,6 @@
 ---
 name: ship
-description: "Take one GitHub issue to main: build it, check it against the issue, open a PR, run fresh-reviewer rounds until green, merge."
+description: "Take one GitHub issue to main: build it, code-review it against the issue, open a PR, run fresh ponytail-review rounds until green, merge."
 disable-model-invocation: true
 ---
 
@@ -20,13 +20,13 @@ Done when you are on the ticket branch with the acceptance criteria in hand.
 
 When the change is docs only, or every changed line only sets a colour, skip `tdd`: no test can see it. Check it with the repo's build and, for a colour, a before and after screenshot. Otherwise call the Skill tool with `tdd`. Where `tdd` says to confirm the seams with the user, take your recommended seams as confirmed: write each one down with its one-line note and carry on. Run type checks and single test files as you go, and commit to the ticket branch. Leave the full checks until after the criteria check below.
 
-Before the PR, check your work against each acceptance criterion yourself; the PR's review rounds are its review, so run no separate review first. Then run the full checks once, and commit.
+Before the PR, check your work against each acceptance criterion yourself and commit everything to the ticket branch. Then call the Skill tool with `code-review`: the fixed point is `origin/<default>`, the tracker is GitHub through `gh`, and the spec is the text of `gh issue view <n> --comments`, so the answers and approved departures recorded in step 1 count as spec. In workers mode you run it yourself once the build worker returns; its two sub-agents are reviewers, dispatched and recorded through `worker-routing`, and a fresh routed worker does the fixes. Fix each hard standards breach and each missing, partial or wrong requirement (Spec a and c) that holds when you check it against the code. Code smells and unrequested behaviour (Spec b) are judgement calls: fix the ones you agree with. Notes that only touch wording, comments or names need no fix. This is the only review before the PR; the PR's review rounds run `ponytail-review`. Then run the full checks once, and commit.
 
-Done when every acceptance criterion is met, the full checks pass, and the tree is clean.
+Done when every acceptance criterion is met, the `code-review` findings are fixed or set aside, the full checks pass, and the tree is clean.
 
 ## 3. Open the PR
 
-Push the branch and open the PR against the default branch with `gh pr create`: the issue's title, and a body whose first line is `Closes #<n>`, or the first line the repo's instructions require instead (such as `Part of #<n>`), then a short summary (what changed, the seams under test, and how it was verified), then a `Criteria` heading that round 1 fills. Post the pass with `gh pr comment`, first line exactly `Checks passed on tree <tree>`, then the commands you ran.
+Push the branch and open the PR against the default branch with `gh pr create`: the issue's title, and a body whose first line is `Closes #<n>`, or the first line the repo's instructions require instead (such as `Part of #<n>`), then a short summary (what changed, the seams under test, how it was verified, and what `code-review` found and what you fixed), then a `Criteria` heading that round 1 fills. Post the pass with `gh pr comment`, first line exactly `Checks passed on tree <tree>`, then the commands you ran.
 
 Done when the PR is open with its checks comment.
 
