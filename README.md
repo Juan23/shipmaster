@@ -2,7 +2,7 @@
 
 Claude Code skills that take GitHub issues to merged without you watching each one.
 
-- **ship** takes one issue to merged: it builds the change test-first, runs `code-review` (coding standards and the issue's spec) and fixes what it finds, opens a PR, runs review rounds with a fresh reviewer until one is clean, and merges. Each PR review runs `ponytail-review` (bugs, safety, load, missing tests, code that shouldn't be there) with the issue; round 1 also gives each acceptance criterion a verdict, met or not met, with its evidence. Notes that only touch wording, comments or names never block the merge.
+- **ship** takes one issue to merged: it builds the change test-first, runs `code-review` (coding standards and the issue's spec) and fixes what it finds, opens a PR, runs review rounds with a fresh reviewer until one is clean, and merges. Each PR review runs `ponytail-review` (bugs, safety, load, missing tests, code that shouldn't be there) with the issue, plus `security-review` when the round's change touches a security path (migrations, policies, auth, edge functions, payments, secrets); round 1 also gives each acceptance criterion a verdict, met or not met, with its evidence. Notes that only touch wording, comments or names never block the merge.
 - **shipmaster** runs `ship` for a batch of issues, one at a time or several at once. As soon as a ship merges, it starts the next unblocked issue. It only coordinates; the ships do the work.
 - **worker-routing** picks the model and effort for each worker subagent from a log of how each tier did on earlier tasks, and adds to that log when the worker finishes. `ship` uses it in workers mode and for its reviewers.
 
