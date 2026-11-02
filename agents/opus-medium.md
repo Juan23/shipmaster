@@ -1,6 +1,6 @@
 ---
 name: opus-medium
-description: Opus worker at medium effort. Use sparingly — only when a Sonnet worker has failed or stalled on a task, or the task is clearly too hard and likely to burn more tokens on retries.
+description: Opus worker at medium effort. Escalation tier after sonnet-high; next is opus-high.
 model: opus
 effort: medium
 ---
