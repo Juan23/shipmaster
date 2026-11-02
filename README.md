@@ -59,7 +59,7 @@ ln -sf ~/Projects/shipmaster/agents/*.md ~/.claude/agents/
 touch ~/.claude/skills/worker-routing/agent-performance-log.jsonl
 ```
 
-The links keep the installed skills on the checkout, so `git pull` updates them. The worker-routing install links its two files instead of the folder, so the log stays in `~/.claude/skills/worker-routing/` and out of the checkout. `touch` creates an empty log on a new machine and leaves an existing one alone. Running the block again after the clone is safe: it replaces copied skill files, copied agents and old links with links to this checkout. It can't fix two leftovers, so delete them first: a `ship` or `shipmaster` folder that is a copy rather than a link, and a `worker-routing` folder that is itself a link.
+The links keep the installed skills on the checkout, so `git pull` updates them. When a pull adds or removes an agent file, rerun the `ln -sf ~/Projects/shipmaster/agents/*.md` line and delete links in `~/.claude/agents/` that no longer point at a file (`find ~/.claude/agents -type l ! -exec test -e {} \; -delete`). The worker-routing install links its two files instead of the folder, so the log stays in `~/.claude/skills/worker-routing/` and out of the checkout. `touch` creates an empty log on a new machine and leaves an existing one alone. Running the block again after the clone is safe: it replaces copied skill files, copied agents and old links with links to this checkout. It can't fix two leftovers, so delete them first: a `ship` or `shipmaster` folder that is a copy rather than a link, and a `worker-routing` folder that is itself a link.
 
 You also need:
 

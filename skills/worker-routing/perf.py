@@ -84,6 +84,7 @@ def stats(rows, a):
 
 LADDER = ["sonnet-medium", "sonnet-high", "opus-medium", "opus-high", "opus-xhigh"]
 HAIKU = "haiku-medium"  # below the ladder, only for the work haiku_ok allows (owner, 2026-11-02)
+RETIRED = {"haiku-high": HAIKU, "opus-low": "sonnet-high"}  # --after a worker started before 2026-11-02 steps above its equivalent
 
 
 def haiku_ok(type_, c):
@@ -139,7 +140,8 @@ def route(rows, a):
         why.append(f"skipped {ladder[i]}: weak")
         i += 1
     if a.after:
-        i = min(max(i, ladder.index(tier(a.after)) + 1 if tier(a.after) in ladder else 0), len(ladder) - 1)
+        after = RETIRED.get(tier(a.after), tier(a.after))
+        i = min(max(i, ladder.index(after) + 1 if after in ladder else 0), len(ladder) - 1)
         why.append(f"after {tier(a.after)} stalled")
     print(f"route: {ladder[i]} ({'; '.join(why)})")
     for t in ladder:
@@ -202,7 +204,7 @@ def main():
     ro = sub.add_parser("route")
     ro.add_argument("--type", required=True, choices=TYPES)
     ro.add_argument("--complexity", required=True, type=cx)
-    ro.add_argument("--after", choices=[HAIKU] + LADDER, help="tier that just stalled on this task; route goes above it")
+    ro.add_argument("--after", choices=[HAIKU] + LADDER + list(RETIRED), help="tier that just stalled on this task; route goes above it")
     rw = sub.add_parser("rework", help="a defect found in a worker's accepted output forced another build/test cycle")
     rw.add_argument("--task", required=True, help="exact --task of the worker row that produced the defect")
     rw.add_argument("--cycles", required=True, type=int, help="extra build/test cycles the defect caused (>= 1)")
