@@ -22,7 +22,7 @@ When the change is docs only, or every changed line only sets a colour, skip `td
 
 Before the PR, check your work against each acceptance criterion yourself and commit everything to the ticket branch. Then call the Skill tool with `code-review`: the fixed point is `origin/<default>`, the tracker is GitHub through `gh`, and the spec is the text of `gh issue view <n> --comments`, so the answers and approved departures recorded in step 1 count as spec. In workers mode you run it yourself once the build worker returns; its two sub-agents are reviewers, dispatched and recorded through `worker-routing`, and a fresh DeepSeek worker does the fixes. Fix each hard standards breach and each missing, partial or wrong requirement (Spec a and c) that holds when you check it against the code. Code smells and unrequested behaviour (Spec b) are judgement calls: fix the ones you agree with. Notes that only touch wording, comments or names need no fix. Then call the Skill tool with `commentdiet` against `origin/<default>` and fix what it finds. These are the only reviews before the PR; the PR's review rounds run `ponytail-review`. Then run the full checks once, and commit.
 
-Done when every acceptance criterion is met, the `code-review` findings are fixed or set aside, the full checks pass, and the tree is clean.
+Done when every acceptance criterion is met, the `code-review` and `commentdiet` findings are fixed or set aside, the full checks pass, and the tree is clean.
 
 ## 3. Open the PR
 

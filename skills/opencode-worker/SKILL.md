@@ -48,7 +48,7 @@ Ping: `perl -e 'alarm shift; exec @ARGV' 120 opencode run --standalone -m "openc
 | Did not start | Non-zero exit within seconds; error on stderr (bad model, not signed in, no funds, binary missing) | Setup failure. Never retry unchanged; report the error. |
 | Started, no first event | No `step_start` within 60s | Provider queue or server start is stuck. Kill it; retry once. |
 | Running and working | New events keep arriving; files change | Leave it. |
-| Alive but idle | Process exists, no new event for 10 min, low CPU | Hidden prompt, network wait or throttling. Kill it. High effort thinks quietly, so judge by CPU and missing events, not silence alone. |
+| Alive but idle | Process exists, no new event for 10 min, low CPU | Hidden prompt, network wait or throttling. Kill it. High effort thinks quietly, so judge by CPU and missing events, not silence alone. The work runs in the client's child server, so read that one: `ps -o %cpu= -p $(pgrep -P $(cat oc.pid))`. |
 | Alive but looping | Same tool call or error 3+ times; a file edited back and forth | Kill it. Narrow the task before any retry. |
 | Busy, no progress | Many reads or thinking, no edits, no `step_finish` | Hard wall-clock limit (the `perl` alarm). |
 | Says done, isn't | Exit 0, task unmet or nothing changed | Never trust its report; check the diff and tests yourself. |
