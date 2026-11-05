@@ -59,6 +59,47 @@ Ping: `perl -e 'alarm shift; exec @ARGV' 120 opencode run --standalone -m "openc
 | Orphan | Wrapper died, opencode still editing | Kill the id in `oc.pid` only, never a broad `pkill`, since other sessions run opencode too. |
 | Every call hangs | Ping times out too | Report it. Never restart the shared opencode service: it runs other sessions' workers. |
 
+## Arena (owner, 2026-11-05, trial)
+
+A build scored complexity 2.0 or more (score it as `worker-routing` does) runs as an **arena**: three workers build the same ticket independently, sharing only facts and blockers, and Claude keeps the best result. Below 2.0, and for every fix round, one worker builds. The owner is watching this trial before deciding whether it becomes its own skill.
+
+### 1. Start
+
+- Commit the ticket branch. Cut three worktrees from its tip, on branches `<ticket branch>-arena-a`, `-b` and `-c`, the way the repo's `AGENTS.md`/`CLAUDE.md` makes worktrees (its script, env file and install step), so the checks can run in each.
+- Make `$SCRATCH/arena/` outside the worktrees, holding empty `a.md`, `b.md`, `c.md` and `claude.md`. Each worker's call writes to `$SCRATCH/arena/<letter>.oc.jsonl`, `.oc.err` and `.oc.pid` in place of the single-run paths, so every check and kill names its letter. opencode reads and writes this folder without a permission prompt (tested 2026-11-05).
+- One brief for all three: the ticket, "commit your work to your branch before you finish", and this paragraph with the worker's letter and the folder filled in:
+
+  > Shared notes: append one line to `<folder>/<letter>.md` each time you learn a fact about the environment or hit a blocker, for example "type check needs `npm run gen` first", "the API returns null for an empty cart", "the fixture lives in tests/fixtures/cart.json", "blocked: migration 042 fails on a clean database". Before each test run, read every other file in that folder; `claude.md` holds corrections from the orchestrator and overrides the rest. Write facts and blockers only: no code, no plan, no approach, no style. Write only to your own file.
+
+### 2. Watch
+
+Watch each run as above. Also read the notes files on each check:
+- A wrong fact: append the correction to `claude.md` ("ignore a.md line 3: the fixture moved to …").
+- A note that carries code, a plan, an approach or style: append "ignore a.md line 3" to `claude.md`.
+- A blocker all three share: decide whether the ticket is blocked before more runs burn on it.
+
+Wait until every run is Done or killed; each call's 30-minute alarm bounds the wait.
+
+### 3. Judge
+
+Run the checks in one worktree at a time.
+1. **Fast checks** on each Done run's committed branch: the type check and the test files it touched. Drop a run that fails them, or that committed nothing.
+2. **Cross-tests**, with two or more survivors: in each survivor's worktree, `git checkout <other branch> -- <test files the other branch changed>` (from `git diff --name-only <ticket branch>...<other branch>`, test files only), run them, then `git reset -q --hard && git clean -fdq` to drop the copies; the tree was clean, since the worker committed. A cross-failure is a bug in that code, an over-specified test, or a helper the test needs that only its own branch has: read the failing test to tell which.
+3. **Read** the two survivors with the fewest real bugs found by cross-tests, the smaller diff breaking a tie. Take one. Graft a piece of the other only when it is small, and only with a test that shows why. With one survivor, take it.
+4. **Log** (below), then **merge** the winner into the ticket branch and remove the three worktrees, their branches and `$SCRATCH/arena/`.
+
+Done when the ticket branch holds the winner and its fast checks pass. The full checks run where the calling skill runs them. With no survivor, discard the worktrees and build once with a single worker, with the notes as facts in its brief.
+
+### 4. Log
+
+Append one line per build to `~/.claude/skills/worker-routing/arena-log.jsonl`, beside the performance log and outside the checkout. Single-worker builds at any complexity get a line too, as the baseline:
+
+```json
+{"date": "2026-11-05", "repo": "Juan23/jj", "ticket": 123, "complexity": 2.5, "workers": 3, "done": 3, "fast_pass": 2, "cross_bugs": {"a": 0, "b": 2}, "winner": "a", "grafted": false, "notes": 7, "corrections": 1, "wall_min": 34}
+```
+
+`notes` counts lines across the workers' files; `corrections` counts lines in `claude.md`; `wall_min` runs from the first call to the merge. A single-worker line has `"workers": 1` and leaves out the arena fields. The review rounds the PR needed are in its comments, so the log leaves them out.
+
 ## Rules
 
 1. One bounded task with a checkable done condition ("tests in X pass", "file Y has Z").
