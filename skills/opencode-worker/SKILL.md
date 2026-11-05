@@ -21,7 +21,7 @@ Reviews and merges never go to DeepSeek: dispatch them as Claude subagents throu
 ```bash
 perl -e 'alarm shift; exec @ARGV' 1800 opencode run --standalone --format json \
   -m "opencode-go/deepseek-v4.1-flash#high" "<task>" \
-  > "$SCRATCH/oc.jsonl" 2> "$SCRATCH/oc.err" &   # SCRATCH: the session scratch folder
+  < /dev/null > "$SCRATCH/oc.jsonl" 2> "$SCRATCH/oc.err" &   # SCRATCH: the session scratch folder
 echo $! > "$SCRATCH/oc.pid"; wait $!
 ```
 
@@ -31,13 +31,14 @@ echo $! > "$SCRATCH/oc.pid"; wait $!
 - Errors exit 1. Exit 0 only means the process ended, not that the task is done.
 - `--format json` prints one event per line (`step_start`, `text`, tool events, `step_finish`), each with `timestamp` and `sessionID`. Save the `sessionID`: `-s <id>` resumes or inspects that run.
 - Leave out `--auto` (it approves every action, and Claude Code's safety check blocks a call that uses it). Runs still finish headless on both Macs; if one waits on a permission prompt, that is the "Alive but idle" row.
+- `< /dev/null` is required: with `--standalone` and an open input, opencode waits on it and the run hangs until the alarm.
 - `--standalone` gives the run its own server. Without it every run shares one `opencode serve --service` process with other sessions' workers, so its CPU tells you nothing and killing the client may not stop it.
 - Run the call with `run_in_background`, and watch `oc.jsonl` with the Monitor tool: an until-loop that ends on the exit, on no `step_start` within 60s, on no new event for 10 minutes, or on the same tool call 3+ times. Waiting only for the exit notice lets an idle or looping run burn the full 30 minutes.
 - Run in its own worktree or branch, one writer per set of files, so a bad run is thrown away instead of untangled.
 
 ## Before real work
 
-Ping: `perl -e 'alarm shift; exec @ARGV' 120 opencode run --standalone -m "opencode-go/deepseek-v4.1-flash#high" "Reply with just: pong"`. Anything but `pong` is a setup failure: report it, do not send the task.
+Ping: `perl -e 'alarm shift; exec @ARGV' 120 opencode run --standalone -m "opencode-go/deepseek-v4.1-flash#high" "Reply with just: pong" < /dev/null`. Anything but `pong` is a setup failure: report it, do not send the task.
 
 ## States and what to do
 
