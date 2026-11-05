@@ -67,7 +67,8 @@ You also need:
 
 - Claude Code 2.1.304 or later (for `-p`, `--session-id`, `--resume` and `stream-json` output);
 - `gh`, signed in, `git` and Python 3;
-- the `tdd` and `code-review` skills and the ponytail plugin (for `ponytail-review`), which `ship` calls.
+- the `tdd`, `code-review` and `commentdiet` skills and the ponytail plugin (for `ponytail-review`), which `ship` calls;
+- for workers mode, opencode signed in to the `opencode-go` provider (the ping in `skills/opencode-worker/SKILL.md` checks it).
 
 Run the shipmaster from a session in auto permission mode; its ships run in auto mode too.
 
