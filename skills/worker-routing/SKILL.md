@@ -1,11 +1,15 @@
 ---
 name: worker-routing
-description: "Use before dispatching any worker subagent (Agent tool) and after one finishes: pick its tier from the performance log, then record the outcome. Also for questions about tier/model statistics."
+description: "Use before dispatching any Claude subagent (Agent tool: reviewers, merges, and the fallback when opencode is down) and after one finishes: pick its tier from the performance log, then record the outcome. Also for questions about tier/model statistics."
 ---
 
 Every worker dispatch is a **routing** decision backed by the performance log, and every finished worker adds one **row** to it. Route to the cheapest tier the evidence doesn't rule out.
 
 Tool: `python3 ~/.claude/skills/worker-routing/perf.py` — `route` before a dispatch, `add` after it, `rework` when its output later needs another build or test cycle, `stats` only when the user asks for statistics. The log is shared by every project (`~/.claude/skills/worker-routing/agent-performance-log.jsonl`), append-only, and owned by the tool: one `route` call and one `add` call per worker, one `rework` call per defect found later, nothing else touches the file.
+
+## Which work comes here (owner, 2026-11-05)
+
+Workers are DeepSeek through opencode (the `opencode-worker` skill), not Claude subagents. Route here only the Claude roles: reviews (type `review`), merges (type `merge`), and the fallback when opencode fails its ping or setup.
 
 ## Tiers
 

@@ -4,7 +4,8 @@ Claude Code skills that take GitHub issues to merged without you watching each o
 
 - **ship** takes one issue to merged: it builds the change test-first, runs `code-review` (coding standards and the issue's spec) and fixes what it finds, opens a PR, runs review rounds with a fresh reviewer until one is clean, and merges. Each PR review runs `ponytail-review` (bugs, safety, load, missing tests, code that shouldn't be there) with the issue, plus `security-review` when the round's change touches a security path (migrations, policies, auth, edge functions, payments, secrets); round 1 also gives each acceptance criterion a verdict, met or not met, with its evidence. Notes that only touch wording, comments or names never block the merge.
 - **shipmaster** runs `ship` for a batch of issues, one at a time or several at once. As soon as a ship merges, it starts the next unblocked issue. It only coordinates; the ships do the work.
-- **worker-routing** picks the model and effort for each worker subagent from a log of how each tier did on earlier tasks, and adds to that log when the worker finishes. `ship` uses it in workers mode and for its reviewers.
+- **opencode-worker** runs DeepSeek through opencode as the worker that builds and fixes code, and tells whether a run is done, stuck, looping or never started. Claude orchestrates, reviews and merges.
+- **worker-routing** picks the Claude model and effort for reviewers, merges and the fallback when opencode is down, from a log of how each tier did on earlier tasks, and adds to that log when the worker finishes.
 
 ```
 shipmaster
@@ -36,7 +37,7 @@ In Claude Code, from a checkout of the repo the issues belong to:
 
 ## worker-routing
 
-Before dispatching a worker, `perf.py route` picks its tier. It starts from a tier set by the task's complexity, drops to a cheaper tier the log has proven on similar tasks, and skips tiers the log shows doing badly. With an empty log it returns the starting tier. After the worker finishes, `perf.py add` records the outcome. If accepted work later needs another build or test cycle, `perf.py rework` marks it, and that tier ranks lower next time.
+Before dispatching a Claude subagent (a reviewer, a merge, or the fallback when opencode is down), `perf.py route` picks its tier. It starts from a tier set by the task's complexity, drops to a cheaper tier the log has proven on similar tasks, and skips tiers the log shows doing badly. With an empty log it returns the starting tier. After the worker finishes, `perf.py add` records the outcome. If accepted work later needs another build or test cycle, `perf.py rework` marks it, and that tier ranks lower next time.
 
 ```bash
 python3 ~/.claude/skills/worker-routing/perf.py route --type coding --complexity 3
@@ -54,18 +55,20 @@ git clone https://github.com/Juan23/shipmaster ~/Projects/shipmaster
 mkdir -p ~/.claude/skills/worker-routing ~/.claude/agents
 ln -sfn ~/Projects/shipmaster/skills/ship ~/.claude/skills/ship
 ln -sfn ~/Projects/shipmaster/skills/shipmaster ~/.claude/skills/shipmaster
+ln -sfn ~/Projects/shipmaster/skills/opencode-worker ~/.claude/skills/opencode-worker
 ln -sf ~/Projects/shipmaster/skills/worker-routing/{SKILL.md,perf.py} ~/.claude/skills/worker-routing/
 ln -sf ~/Projects/shipmaster/agents/*.md ~/.claude/agents/
 touch ~/.claude/skills/worker-routing/agent-performance-log.jsonl
 ```
 
-The links keep the installed skills on the checkout, so `git pull` updates them. When a pull adds or removes an agent file, rerun the `ln -sf ~/Projects/shipmaster/agents/*.md` line and delete links in `~/.claude/agents/` that no longer point at a file (`find ~/.claude/agents -type l ! -exec test -e {} \; -delete`). The worker-routing install links its two files instead of the folder, so the log stays in `~/.claude/skills/worker-routing/` and out of the checkout. `touch` creates an empty log on a new machine and leaves an existing one alone. Running the block again after the clone is safe: it replaces copied skill files, copied agents and old links with links to this checkout. It can't fix two leftovers, so delete them first: a `ship` or `shipmaster` folder that is a copy rather than a link, and a `worker-routing` folder that is itself a link.
+The links keep the installed skills on the checkout, so `git pull` updates them. When a pull adds or removes an agent file, rerun the `ln -sf ~/Projects/shipmaster/agents/*.md` line and delete links in `~/.claude/agents/` that no longer point at a file (`find ~/.claude/agents -type l ! -exec test -e {} \; -delete`). The worker-routing install links its two files instead of the folder, so the log stays in `~/.claude/skills/worker-routing/` and out of the checkout. `touch` creates an empty log on a new machine and leaves an existing one alone. Running the block again after the clone is safe: it replaces copied skill files, copied agents and old links with links to this checkout. It can't fix two leftovers, so delete them first: a `ship`, `shipmaster` or `opencode-worker` folder that is a copy rather than a link, and a `worker-routing` folder that is itself a link.
 
 You also need:
 
 - Claude Code 2.1.304 or later (for `-p`, `--session-id`, `--resume` and `stream-json` output);
 - `gh`, signed in, `git` and Python 3;
-- the `tdd` and `code-review` skills and the ponytail plugin (for `ponytail-review`), which `ship` calls.
+- the `tdd`, `code-review` and `commentdiet` skills and the ponytail plugin (for `ponytail-review`), which `ship` calls;
+- for workers mode, opencode signed in to the `opencode-go` provider (the ping in `skills/opencode-worker/SKILL.md` checks it).
 
 Run the shipmaster from a session in auto permission mode; its ships run in auto mode too.
 
