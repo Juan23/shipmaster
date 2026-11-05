@@ -37,7 +37,7 @@ In Claude Code, from a checkout of the repo the issues belong to:
 
 ## worker-routing
 
-Before dispatching a worker, `perf.py route` picks its tier. It starts from a tier set by the task's complexity, drops to a cheaper tier the log has proven on similar tasks, and skips tiers the log shows doing badly. With an empty log it returns the starting tier. After the worker finishes, `perf.py add` records the outcome. If accepted work later needs another build or test cycle, `perf.py rework` marks it, and that tier ranks lower next time.
+Before dispatching a Claude subagent (a reviewer, a merge, or the fallback when opencode is down), `perf.py route` picks its tier. It starts from a tier set by the task's complexity, drops to a cheaper tier the log has proven on similar tasks, and skips tiers the log shows doing badly. With an empty log it returns the starting tier. After the worker finishes, `perf.py add` records the outcome. If accepted work later needs another build or test cycle, `perf.py rework` marks it, and that tier ranks lower next time.
 
 ```bash
 python3 ~/.claude/skills/worker-routing/perf.py route --type coding --complexity 3

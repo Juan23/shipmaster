@@ -21,7 +21,7 @@ Reviews and merges never go to DeepSeek: dispatch them as Claude subagents throu
 ```bash
 perl -e 'alarm shift; exec @ARGV' 1800 opencode run --auto --format json \
   -m "opencode-go/deepseek-v4.1-flash#high" "<task>" \
-  > "$SCRATCH/oc.jsonl" 2> "$SCRATCH/oc.err"
+  > "$SCRATCH/oc.jsonl" 2> "$SCRATCH/oc.err"   # SCRATCH: the session scratch folder
 ```
 
 - The `perl` line is a 30-minute hard limit that works on every Mac; `timeout` is not installed on the m1air.
@@ -41,6 +41,7 @@ Ping: `opencode run -m "opencode-go/deepseek-v4.1-flash#high" "Reply with just: 
 
 | State | Sign | Action |
 |---|---|---|
+| Done | Final `step_finish`, exit 0, and the done condition holds when you check it | Review it with Claude, then clean up. |
 | Did not start | Non-zero exit within seconds; error on stderr (bad model, not signed in, no funds, binary missing) | Setup failure. Never retry unchanged; report the error. |
 | Started, no first event | No `step_start` within 60s | Background service or provider queue is stuck. Kill it; retry once with `--standalone`. |
 | Running and working | New events keep arriving; files change | Leave it. |
@@ -53,11 +54,11 @@ Ping: `opencode run -m "opencode-go/deepseek-v4.1-flash#high" "Reply with just: 
 | Provider error midway | Error event or exit 1 after some events (rate limit, funds, context too long) | Retry once if temporary; report funds or access errors. |
 | Output cut short | No final `step_finish` | Failure, even with exit 0. |
 | Orphan | Wrapper died, opencode still editing | Record the worker's process id at launch; at cleanup kill that id only, never a broad `pkill`, since other sessions may run opencode too. |
-| Service broken | Every call hangs, ping included | Restart with `opencode service`, or use `--standalone`. |
+| Service broken | Every call hangs, ping included | `opencode service restart`, or use `--standalone`. |
 
 ## Rules
 
 1. One bounded task with a checkable done condition ("tests in X pass", "file Y has Z").
-2. Retry only temporary failures, at most twice. Never retry setup or account errors.
+2. Retry only temporary failures, and only once. Never retry setup or account errors.
 3. Keep `oc.jsonl` and `oc.err` until the result is checked.
 4. Check the result yourself: diff, the repo's checks, scope. Then clean up the process and the worktree.

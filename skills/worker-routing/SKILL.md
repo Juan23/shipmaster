@@ -1,6 +1,6 @@
 ---
 name: worker-routing
-description: "Use before dispatching any worker subagent (Agent tool) and after one finishes: pick its tier from the performance log, then record the outcome. Also for questions about tier/model statistics."
+description: "Use before dispatching any Claude subagent (Agent tool: reviewers, merges, and the fallback when opencode is down) and after one finishes: pick its tier from the performance log, then record the outcome. Also for questions about tier/model statistics."
 ---
 
 Every worker dispatch is a **routing** decision backed by the performance log, and every finished worker adds one **row** to it. Route to the cheapest tier the evidence doesn't rule out.
