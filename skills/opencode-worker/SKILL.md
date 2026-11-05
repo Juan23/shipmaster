@@ -19,7 +19,7 @@ Reviews and merges never go to DeepSeek: dispatch them as Claude subagents throu
 ## The call
 
 ```bash
-perl -e 'alarm shift; exec @ARGV' 1800 opencode run --auto --format json \
+perl -e 'alarm shift; exec @ARGV' 1800 opencode run --format json \
   -m "opencode-go/deepseek-v4.1-flash#high" "<task>" \
   > "$SCRATCH/oc.jsonl" 2> "$SCRATCH/oc.err"   # SCRATCH: the session scratch folder
 ```
@@ -29,7 +29,7 @@ perl -e 'alarm shift; exec @ARGV' 1800 opencode run --auto --format json \
 - An unknown `#variant` is rejected at once, so a typo cannot silently drop the effort.
 - Errors exit 1. Exit 0 only means the process ended, not that the task is done.
 - `--format json` prints one event per line (`step_start`, `text`, tool events, `step_finish`), each with `timestamp` and `sessionID`. Save the `sessionID`: `-s <id>` resumes or inspects that run.
-- Without `--auto`, a headless run can hang forever on a permission prompt.
+- Leave out `--auto` (it approves every action, and Claude Code's safety check blocks a call that uses it). Runs still finish headless on both Macs; if one waits on a permission prompt, that is the "Alive but idle" row.
 - Run it with `run_in_background` and wait for the exit notice; do not poll in a loop.
 - Run in its own worktree or branch, one writer per set of files, so a bad run is thrown away instead of untangled.
 
