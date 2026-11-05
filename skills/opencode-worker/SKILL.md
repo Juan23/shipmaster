@@ -61,7 +61,7 @@ Ping: `perl -e 'alarm shift; exec @ARGV' 120 opencode run --standalone -m "openc
 
 ## Arena (owner, 2026-11-05, trial)
 
-A build scored complexity 2.0 or more (score it as `worker-routing` does) runs as an **arena**: three workers build the same ticket independently, sharing only facts and blockers, and Claude keeps the best result. Below 2.0, and for every fix round, one worker builds.
+A build scored complexity 2.0 or more (score it as `worker-routing` does) runs as an **arena**: three workers build the same ticket independently, sharing only facts and blockers, and Claude keeps the best result. Below 2.0, and for every fix round, one worker builds; each build either way gets a log line (step 4).
 
 ### 1. Start
 
@@ -84,11 +84,11 @@ Wait until every run is Done or killed; each call's 30-minute alarm bounds the w
 
 Run the checks in one worktree at a time.
 1. **Fast checks** on each Done run's committed branch: the type check and the test files it touched. Drop a run that fails them, or that committed nothing.
-2. **Cross-tests**, with two or more survivors: in each survivor's worktree, `git checkout <other branch> -- <test files the other branch changed>` (from `git diff --name-only <ticket branch>...<other branch>`, test files only), run them, then `git reset -q --hard && git clean -fdq` to drop the copies; only committed work counts, so nothing of the worker's is lost. A cross-failure is a bug in that code, an over-specified test, or a helper the test needs that only its own branch has: read the failing test to tell which.
+2. **Cross-tests**, with two or more survivors: in each survivor's worktree, `git checkout <other branch> -- <test files the other branch changed>` (from `git diff --name-only --diff-filter=AM <ticket branch>...<other branch>`, test files only), run them, then `git reset -q --hard && git clean -fdq` to drop the copies; only committed work counts, so nothing of the worker's is lost. A cross-failure is a bug in that code, an over-specified test, or a helper the test needs that only its own branch has: read the failing test to tell which.
 3. **Read** the two survivors with the fewest real bugs found by cross-tests, the smaller diff breaking a tie. Take one. Graft a piece of the other only when it is small, and only with a test that shows why. With one survivor, take it.
 4. **Log** (below), move the notes files to `~/.claude/arena-notes/<repo>-<ticket>/` for the owner to read, then **merge** the winner into the ticket branch and remove the three worktrees, their branches and `$SCRATCH/arena/`.
 
-Done when the ticket branch holds the winner and its fast checks pass. The full checks run where the calling skill runs them. With no survivor, remove the worktrees and build once with a single worker, with the notes as facts in its brief.
+Done when the ticket branch holds the winner and its fast checks pass. The full checks run where the calling skill runs them. With no survivor, do step 4 with `"winner": null` and no merge, then build once with a single worker, with the notes as facts in its brief; its log line carries `"after_arena": true`, so it is not a baseline line.
 
 ### 4. Log
 
