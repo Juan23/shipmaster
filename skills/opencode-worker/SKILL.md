@@ -61,7 +61,7 @@ Ping: `perl -e 'alarm shift; exec @ARGV' 120 opencode run --standalone -m "openc
 
 ## Arena (owner, 2026-11-05, trial)
 
-A build scored complexity 2.0 or more (score it as `worker-routing` does) runs as an **arena**: three workers build the same ticket independently, sharing only facts and blockers, and Claude keeps the best result. Below 2.0, and for every fix round, one worker builds; each build either way gets a log line (step 4).
+A build scored complexity 2.0 or more (score it as `worker-routing` does) runs as an **arena**: three workers build the same ticket independently, sharing only facts and blockers, and Claude keeps the best result. Below 2.0, and for every fix round, one worker builds; each build either way gets a log line (step 4), and fix rounds get none.
 
 ### 1. Start
 
