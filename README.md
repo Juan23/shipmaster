@@ -27,13 +27,12 @@ In Claude Code, from a checkout of the repo the issues belong to:
 
 ## How it works
 
-- Each ship is a headless `claude -p` session in its own git worktree, started in the background by `run-ship.sh`. When a ship's turn ends, the command exits and wakes the shipmaster. It also exits 15 minutes after the ship's reply when something the ship left running, such as a server, keeps its process open; the shipmaster never resumes a ship while that process is alive.
+- Each ship is a background subagent of the shipmaster session, working in its own git worktree. When a ship's turn ends, its reply wakes the shipmaster, which answers it with a follow-up message. Ships use the shipmaster session's sign-in and permission mode, and they end when that session ends.
 - Blockers come from GitHub's issue dependencies, or from a `Blocked by: #n` line in the issue body. An issue that already has an open PR continues that PR on its branch. Without one, a pushed `ticket/<n>-*` branch with commits not yet on the default branch and no PR is taken as earlier work, and the ship builds on it instead of starting over.
 - With more than one ship, a **baton** lets one ship at a time merge or use a phone, emulator or Simulator, so ships never share a device or load the machine with two merge checks.
 - When a ship needs an answer from you, the question appears in the shipmaster session, and your reply goes back to that ship.
 - All state is on disk in the session scratchpad (`ships/`), and the shipmaster rebuilds it from there and from GitHub on every wake.
-- A ship with no output for two hours is stopped, along with the processes it started.
-- Ships run on Opus 5.5 at medium effort unless `~/.claude/shipmaster-defaults` names another model or effort (`model=<id>`, `effort=<level>`). `/shipmaster set default to …` writes it. The file is per machine, and the shipmaster session's own model does not carry over to its ships.
+- Ships run on Opus 5.5 at medium effort unless `~/.claude/shipmaster-defaults` names another model or effort (`model=<id>`, `effort=<level>`); a ship runs the current model of the family the id names. `/shipmaster set default to …` writes it. The file is per machine, and the shipmaster session's own model does not carry over to its ships.
 
 ## worker-routing
 
@@ -65,17 +64,9 @@ The links keep the installed skills on the checkout, so `git pull` updates them.
 
 You also need:
 
-- Claude Code 2.1.304 or later (for `-p`, `--session-id`, `--resume` and `stream-json` output);
+- Claude Code with the Agent and SendMessage tools;
 - `gh`, signed in, `git` and Python 3;
 - the `tdd`, `code-review` and `commentdiet` skills and the ponytail plugin (for `ponytail-review`), which `ship` calls;
 - for workers mode, opencode signed in to the `opencode-go` provider (the ping in `skills/opencode-worker/SKILL.md` checks it).
 
 Run the shipmaster from a session in auto permission mode; its ships run in auto mode too.
-
-## Test
-
-```bash
-skills/shipmaster/run-ship.test.sh
-```
-
-It runs `run-ship.sh` against a fake `claude`. It checks that arguments and exit codes pass through, that the hang timer and a stop signal both end the ship and the processes it started, and that a ship which replied and then went quiet ends the command but is left running.
