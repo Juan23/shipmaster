@@ -38,7 +38,7 @@ While live ships are fewer than the count, take the next unblocked issue in plan
 
 3. **Start** it with the Agent tool: `subagent_type` `general-purpose`, `description` `ship #<n>`, `model` and `effort` from the ship default, and the text of `1.msg` as the prompt. Write the agent id the tool returns to the `ship` file's `agent` line, and this session's process id (`$CLAUDE_PID`, which changes on every start or resume of the session) to its `launch` line.
 
-To **resume** a ship, write the message to the next `<k>.msg` and send that text with SendMessage to the ship's agent id (load SendMessage and TaskStop with ToolSearch first when they are deferred). When the Agent or SendMessage call fails, write its error as that turn's `<k>.reply`. Rewrite its `launch` line the same way. The ship carries on with its whole context. When a ship's turn ends, its reply reaches you and wakes you.
+To **resume** a ship, write the message to the next `<k>.msg` send that text with SendMessage to the ship's agent id, and write this session's `$CLAUDE_PID` to the ship's `launch` line (load SendMessage and TaskStop with ToolSearch first when they are deferred). When the Agent or SendMessage call fails, write its error as that turn's `<k>.reply`. The ship carries on with its whole context. When a ship's turn ends, its reply reaches you and wakes you.
 
 ## 3. Each wake
 
@@ -52,7 +52,7 @@ On every wake and every user message, rebuild the state from GitHub and `ships/`
 6. **device run done**: its reply ends with `device run done: <result>`.
 7. **stopped**: anything else: an error, five review rounds without a clean one, a ship with no reply after this session restarted or resumed, or a ship whose agent can no longer take a message. Report its last reply.
 
-**Never message a working ship**: a second message mid-turn would mix two turns in one worktree. Where an action below would resume it, wait for its reply. While any ship is working, keep one background `sleep 7200` command running (its task id in `ships/sleep`; start another only once that one has ended), so a wake comes even when no ship replies. A ship that has worked for two hours with no new commit or PR activity may be stuck; tell the user, and stop it with TaskStop only on their word, then write `stopped by the user` as that turn's `<k>.reply`.
+**Never message a working ship**: a second message mid-turn would mix two turns in one worktree. Where an action below would resume it, wait for its reply. While any ship is working, keep one background `sleep 7200` command running (`<task id> <$CLAUDE_PID>` in `ships/sleep`; start another once that one has ended, and a sleep started under another `$CLAUDE_PID` has ended), so a wake comes even when no ship replies. A ship that has worked for two hours with no new commit or PR activity may be stuck; tell the user, and stop it with TaskStop only on their word, then write `stopped by the user` as that turn's `<k>.reply`.
 
 Then act, in this order:
 
