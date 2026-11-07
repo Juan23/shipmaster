@@ -32,6 +32,7 @@ In Claude Code, from a checkout of the repo the issues belong to:
 - With more than one ship, a **baton** lets one ship at a time merge or use a phone, emulator or Simulator, so ships never share a device or load the machine with two merge checks.
 - When a ship needs an answer from you, the question appears in the shipmaster session, and your reply goes back to that ship.
 - All state is on disk in the session scratchpad (`ships/`), and the shipmaster rebuilds it from there and from GitHub on every wake.
+- A ship that has worked for two hours with no new commit or PR activity is reported to you, and stopped only if you say so.
 - Ships run on Opus 5.5 at medium effort unless `~/.claude/shipmaster-defaults` names another model or effort (`model=<id>`, `effort=<level>`); a ship runs the current model of the family the id names. `/shipmaster set default to …` writes it. The file is per machine, and the shipmaster session's own model does not carry over to its ships.
 
 ## worker-routing
@@ -69,4 +70,4 @@ You also need:
 - the `tdd`, `code-review` and `commentdiet` skills and the ponytail plugin (for `ponytail-review`), which `ship` calls;
 - for workers mode, opencode signed in to the `opencode-go` provider (the ping in `skills/opencode-worker/SKILL.md` checks it).
 
-Run the shipmaster from a session in auto permission mode; its ships run in auto mode too.
+Run the shipmaster from a session in auto permission mode.
