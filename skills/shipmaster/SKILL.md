@@ -38,7 +38,7 @@ While live ships are fewer than the count, take the next unblocked issue in plan
 
 3. **Start** it with the Agent tool: `subagent_type` `general-purpose`, `description` `ship #<n>`, `model` and `effort` from the ship default, and the text of `1.msg` as the prompt. Write the agent id the tool returns to the `ship` file's `agent` line, and this session's process id (`$CLAUDE_PID`, which changes on every start or resume of the session) to its `launch` line.
 
-To **resume** a ship, write the message to the next `<k>.msg` send that text with SendMessage to the ship's agent id, and write this session's `$CLAUDE_PID` to the ship's `launch` line (load SendMessage and TaskStop with ToolSearch first when they are deferred). When the Agent or SendMessage call fails, write its error as that turn's `<k>.reply`. The ship carries on with its whole context. When a ship's turn ends, its reply reaches you and wakes you.
+To **resume** a ship, write the message to the next `<k>.msg`, send that text with SendMessage to the ship's agent id, and write this session's `$CLAUDE_PID` to the ship's `launch` line (load SendMessage and TaskStop with ToolSearch first when they are deferred). When the Agent or SendMessage call fails, write its error as that turn's `<k>.reply`. The ship carries on with its whole context. When a ship's turn ends, its reply reaches you and wakes you.
 
 ## 3. Each wake
 
