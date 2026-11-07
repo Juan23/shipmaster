@@ -21,7 +21,7 @@ First check that the skills are current, since every ship reads them at its star
 
 For each issue read `gh issue view <n> --json number,title,state,body` and its blockers, `gh api repos/<owner>/<repo>/issues/<n>/dependencies/blocked_by --jq '.[] | {number, state}'`, plus any `Blocked by: #a, #b` line in the body. Note the issue's **open PR**, if one exists: an open PR whose body names `#<n>` (`gh pr list --state open --json number,headRefName,body`). Without one, note its **earlier branch**, if one exists: after `git fetch origin`, a remote `ticket/<n>-*` branch (`git ls-remote --heads origin 'refs/heads/ticket/<n>-*'`), other than the one in its `ships/<n>/ship` file, with commits not on `origin/<default>` (`git rev-list --count origin/<default>..origin/<branch>`) and no PR in any state (`gh pr list --head <branch> --state all`); with several, take the one with the newest commit and name the rest in the plan. A closed issue is reported and dropped. An issue is **unblocked** when every blocker is closed. An issue is **stuck** when a blocker is open and outside the batch, stuck itself, or has a ship that merged or stopped without closing it; report it with that blocker. Recheck this on every wake.
 
-Order the batch blockers first, otherwise in the user's order. State the plan in a few lines (the order, what starts now, what waits on what, what is stuck, each open PR or earlier branch a ship will take over, and any open PRs outside the batch), write the order, the count and `session=` this session's id (`$CLAUDE_CODE_SESSION_ID`) to `ships/batch` in the session scratchpad, and go straight on to step 2. When the user adds issues later, plan them the same way and append them to the order.
+Order the batch blockers first, otherwise in the user's order. State the plan in a few lines (the order, what starts now, what waits on what, what is stuck, each open PR or earlier branch a ship will take over, and any open PRs outside the batch), write the order, the count and `launch=` this session's process id (`$CLAUDE_PID`, which changes on every start or resume of the session) to `ships/batch` in the session scratchpad, and go straight on to step 2. When the user adds issues later, plan them the same way and append them to the order.
 
 Done when every issue is ordered or reported.
 
@@ -44,7 +44,7 @@ To **resume** a ship, write the message to the next `<k>.msg` and send that text
 
 On every wake and every user message, rebuild the state from GitHub and `ships/`; they hold everything, so nothing depends on your memory of earlier turns. A ship's reply is its latest `<k>.reply`. Give each ship the first state that matches:
 
-1. **working**: its latest `<k>.msg` has no `<k>.reply` yet, its `ship` file has an `agent` line, and the `session` line in `ships/batch` is this session's id. Ships end with the session that started them, so after a restart a ship with no reply is stopped.
+1. **working**: its latest `<k>.msg` has no `<k>.reply` yet, its `ship` file has an `agent` line, and the `launch` line in `ships/batch` is this session's `$CLAUDE_PID`. Ships end with the session process that started them, so after a restart or resume a ship with no reply is stopped.
 2. **waiting**: its reply ends with `waiting on the user: <question>`, even after its PR merged (a refused write after the merge asks this way). Pass the question to the user word for word, with the issue, once per reply. Resume the ship with their answer as they wrote it.
 3. **merged**: `gh pr list --head <branch> --state merged` finds its PR. Remove its worktree with `git worktree remove <path>` to free the disk: its commits are on the default branch, and ship copies its evidence out before merging. Only a dirty worktree stays, since uncommitted edits are on no branch; report it.
 4. **ready**: its reply ends with `ready to merge <PR url>`.
@@ -52,7 +52,7 @@ On every wake and every user message, rebuild the state from GitHub and `ships/`
 6. **device run done**: its reply ends with `device run done: <result>`.
 7. **stopped**: anything else: an error, five review rounds without a clean one, a ship with no reply after this session restarted, or a ship whose agent can no longer take a message. Report its last reply.
 
-**Never message a working ship**: a second message mid-turn would mix two turns in one worktree. Where an action below would resume it, wait for its reply. A ship that has worked for two hours with no new commit or PR activity may be stuck; tell the user, and stop it with TaskStop only on their word.
+**Never message a working ship**: a second message mid-turn would mix two turns in one worktree. Where an action below would resume it, wait for its reply. While any ship is working, keep one background `sleep 7200` command running, so a wake comes even when no ship replies. A ship that has worked for two hours with no new commit or PR activity may be stuck; tell the user, and stop it with TaskStop only on their word, then write `stopped by the user` as that turn's `<k>.reply`.
 
 Then act, in this order:
 
