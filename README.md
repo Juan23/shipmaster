@@ -4,8 +4,8 @@ Claude Code skills that take GitHub issues to merged without you watching each o
 
 - **ship** takes one issue to merged: it builds the change test-first, runs `code-review` (coding standards and the issue's spec) and fixes what it finds, opens a PR, runs review rounds with a fresh reviewer until one is clean, and merges. Each PR review runs `ponytail-review` (bugs, safety, load, missing tests, code that shouldn't be there) with the issue, plus `security-review` when the round's change touches a security path (migrations, policies, auth, edge functions, payments, secrets); round 1 also gives each acceptance criterion a verdict, met or not met, with its evidence. Notes that only touch wording, comments or names never block the merge.
 - **shipmaster** runs `ship` for a batch of issues, one at a time or several at once. As soon as a ship merges, it starts the next unblocked issue. It only coordinates; the ships do the work.
-- **opencode-worker** runs DeepSeek through opencode as the worker that builds and fixes code, and tells whether a run is done, stuck, looping or never started. From complexity 2.0 a build runs as an arena: three workers sharing only facts and blockers, and Claude keeps the best. Claude orchestrates, reviews and merges.
-- **worker-routing** picks the Claude model and effort for reviewers, merges and the fallback when opencode is down, from a log of how each tier did on earlier tasks, and adds to that log when the worker finishes.
+- **opencode-worker** runs DeepSeek through opencode, only when you ask for it by name; `ship` and `shipmaster` never call it. It tells whether a run is done, stuck, looping or never started.
+- **worker-routing** picks the Claude model and effort for builds, fixes, device runs, reviewers and merges, from a log of how each tier did on earlier tasks, and adds to that log when the worker finishes.
 
 ```
 shipmaster
@@ -37,7 +37,7 @@ In Claude Code, from a checkout of the repo the issues belong to:
 
 ## worker-routing
 
-Before dispatching a Claude subagent (a reviewer, a merge, or the fallback when opencode is down), `perf.py route` picks its tier. It starts from a tier set by the task's complexity, drops to a cheaper tier the log has proven on similar tasks, and skips tiers the log shows doing badly. With an empty log it returns the starting tier. After the worker finishes, `perf.py add` records the outcome. If accepted work later needs another build or test cycle, `perf.py rework` marks it, and that tier ranks lower next time.
+Before dispatching a Claude subagent (a build, a fix, a device run, a reviewer or a merge), `perf.py route` picks its tier. It starts from a tier set by the task's complexity, drops to a cheaper tier the log has proven on similar tasks, and skips tiers the log shows doing badly. With an empty log it returns the starting tier. After the worker finishes, `perf.py add` records the outcome. If accepted work later needs another build or test cycle, `perf.py rework` marks it, and that tier ranks lower next time.
 
 ```bash
 python3 ~/.claude/skills/worker-routing/perf.py route --type coding --complexity 3
@@ -68,6 +68,5 @@ You also need:
 - Claude Code with the Agent and SendMessage tools;
 - `gh`, signed in, `git` and Python 3;
 - the `tdd`, `code-review` and `commentdiet` skills and the ponytail plugin (for `ponytail-review`), which `ship` calls;
-- for workers mode, opencode signed in to the `opencode-go` provider (the ping in `skills/opencode-worker/SKILL.md` checks it).
 
 Run the shipmaster from a session in auto permission mode.
