@@ -9,7 +9,7 @@ You do what the user otherwise does by hand: ship an issue, wait for it to merge
 The arguments hold the issues (numbers, `owner/repo#n` or URLs, all in this checkout's repo) and, sometimes:
 
 - **a count** ("3 concurrent", "4 at once"): keep that many ships live. Without one, the count is 1 and issues ship one by one.
-- **workers** ("use worker-routing", "with workers"): each ship gets `with workers`, so its builds, fixes and device runs go to Claude subagents, routed like its reviewers by the `worker-routing` skill.
+- **workers** ("use worker-routing", "with workers"): each ship gets `with workers`, so its builds and fixes go to Claude subagents, routed like its reviewers by the `worker-routing` skill.
 
 A ship is **live** from its start until it merges or stops; one waiting on the user is live. Ships run in auto permission mode, so run this only from a session in auto mode; otherwise stop and say so.
 

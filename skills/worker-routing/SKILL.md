@@ -1,6 +1,6 @@
 ---
 name: worker-routing
-description: "Use before dispatching any Claude subagent (Agent tool: builds, fixes, device runs, reviewers, merges) and after one finishes: pick its tier from the performance log, then record the outcome. Also for questions about tier/model statistics."
+description: "Use before dispatching any Claude subagent (Agent tool: builds, fixes, reviewers, merges) and after one finishes: pick its tier from the performance log, then record the outcome. Also for questions about tier/model statistics."
 ---
 
 Every worker dispatch is a **routing** decision backed by the performance log, and every finished worker adds one **row** to it. Route to the cheapest tier the evidence doesn't rule out.
@@ -9,7 +9,7 @@ Tool: `python3 ~/.claude/skills/worker-routing/perf.py` — `route` before a dis
 
 ## Which work comes here (owner, 2026-11-08)
 
-Workers are Claude subagents. Route every dispatch here: builds and fixes (type `coding`), device runs (`device-run`), reviews (`review`) and merges (`merge`).
+Workers are Claude subagents. Route every dispatch here: builds and fixes (type `coding`, or a harness type), reviews (`review`) and merges (`merge`).
 
 ## Tiers
 
