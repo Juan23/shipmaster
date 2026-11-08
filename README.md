@@ -20,7 +20,7 @@ In Claude Code, from a checkout of the repo the issues belong to:
 ```
 /shipmaster 12 13 14                   one by one
 /shipmaster 12 13 14 15 3 concurrent   three ships at a time
-/shipmaster 12 13 use worker-routing   ships build and fix through workers
+/shipmaster 12 13 use worker-routing   ships build, fix and run devices through workers
 /shipmaster set default to sonnet 5.5 high   the model and effort every ship runs on
 /ship 12                               a single issue
 ```
