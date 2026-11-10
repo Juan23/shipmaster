@@ -69,10 +69,10 @@ Merge only a green PR, and only the commit you checked, with the repo's own merg
 Send the merge once. Auto mode's permission check never sees a command's output, so a second merge reads to it as merging twice, and after one refusal it treats every later merge as a way around it. So let the one command retry a network failure itself and stop as soon as the PR reads `MERGED`:
 
 ```bash
-for d in 0 2 4 8; do sleep $d; <merge command>; [ "$(gh pr view <pr> --json state -q .state)" = MERGED ] && break; done
+for d in 0 2 4 8; do sleep $d; <merge command> && break; [ "$(gh pr view <pr> --json state -q .state)" = MERGED ] && break; done
 ```
 
-When the permission check refuses the merge, run no merge again in any form, and end your turn with `waiting on the user: merge of <PR url> refused: <the reason it gave>`.
+When the permission check refuses the merge, or all four tries fail, run no merge again in any form, and ask the user to merge it by hand, naming the PR url and the refusal or last error. When you resume, check that the PR shows `MERGED`, then finish the rest of this step.
 
 Done when the PR shows `MERGED`, the issue shows `CLOSED` (close it yourself when the PR body did not, or leave it open with a comment naming what remains where the repo's closing rules say so), and the checkout is detached at the updated `origin/<default>`, since another worktree may hold the default branch.
 
