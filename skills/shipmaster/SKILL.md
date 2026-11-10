@@ -45,7 +45,7 @@ To **resume** a ship, write the message to the next `<k>.msg`, send that text wi
 On every wake and every user message, rebuild the state from GitHub and `ships/`; they hold everything, so nothing depends on your memory of earlier turns. A ship's reply is its latest `<k>.reply`. Give each ship the first state that matches:
 
 1. **working**: its latest `<k>.msg` has no `<k>.reply` yet, its `ship` file has an `agent` line, and its `launch` line is this session's `$CLAUDE_PID`. Ships end with the session process that started them, so after a restart or resume a ship with no reply is stopped.
-2. **waiting**: its reply ends with `waiting on the user: <question>`, even after its PR merged (a refused write after the merge asks this way). Pass the question to the user word for word, with the issue, once per reply. Resume the ship with their answer as they wrote it.
+2. **waiting**: its reply ends with `waiting on the user: <question>`, even after its PR merged (a refused write after the merge asks this way). Pass the question to the user word for word, with the issue, once per reply. Resume the ship with their answer as they wrote it. A refused merge is the user's to run or allow: never run it from here.
 3. **merged**: `gh pr list --head <branch> --state merged` finds its PR. Remove its worktree with `git worktree remove <path>` to free the disk: its commits are on the default branch, and ship copies its evidence out before merging. Only a dirty worktree stays, since uncommitted edits are on no branch; report it.
 4. **ready**: its reply ends with `ready to merge <PR url>`.
 5. **needs the baton**: its reply ends with `needs the baton: <the run>`.

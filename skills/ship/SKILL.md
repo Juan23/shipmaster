@@ -66,6 +66,14 @@ When the branch is behind or `CONFLICTING`, merge `origin/<default>` into it, re
 
 Merge only a green PR, and only the commit you checked, with the repo's own merge command where its instructions name one (such as `node scripts/merge-gate.mjs <pr>`), otherwise `gh pr merge --squash --delete-branch --match-head-commit <headRefOid>`. When the cleanup after the merge fails because another worktree holds the default branch, the merge still stands; delete the remote branch if it remains.
 
+Send the merge once. Auto mode's permission check never sees a command's output, so a second merge reads to it as merging twice, and after one refusal it treats every later merge as a way around it. So let the one command retry a network failure itself and stop as soon as the PR reads `MERGED`:
+
+```bash
+for d in 0 2 4 8; do sleep $d; <merge command>; [ "$(gh pr view <pr> --json state -q .state)" = MERGED ] && break; done
+```
+
+When the permission check refuses the merge, run no merge again in any form, and end your turn with `waiting on the user: merge of <PR url> refused: <the reason it gave>`.
+
 Done when the PR shows `MERGED`, the issue shows `CLOSED` (close it yourself when the PR body did not, or leave it open with a comment naming what remains where the repo's closing rules say so), and the checkout is detached at the updated `origin/<default>`, since another worktree may hold the default branch.
 
 Report the merged PR, the number of rounds, where its evidence is kept, and the non-blocking notes from the last review.
