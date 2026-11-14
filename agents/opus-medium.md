@@ -1,6 +1,6 @@
 ---
 name: opus-medium
-description: Opus worker at medium effort. Escalation tier after sonnet-high; next is opus-high.
+description: Opus worker at medium effort. Escalation tier after sonnet-high; next is opus-high. PR reviews go to pr-reviewer or merge-reviewer.
 model: opus
 effort: medium
 ---

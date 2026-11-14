@@ -2,7 +2,7 @@
 
 Claude Code skills that take GitHub issues to merged without you watching each one.
 
-- **ship** takes one issue to merged: it builds the change test-first, runs `code-review` (coding standards and the issue's spec) and fixes what it finds, opens a PR, runs review rounds with a fresh reviewer until one is clean, and merges. Each PR review runs `ponytail-review` (bugs, safety, load, missing tests, code that shouldn't be there) with the issue, plus `security-review` when the round's change touches a security path (migrations, policies, auth, edge functions, payments, secrets); round 1 also gives each acceptance criterion a verdict, met or not met, with its evidence. Notes that only touch wording, comments or names never block the merge.
+- **ship** takes one issue to merged: it builds the change test-first, runs `code-review` (coding standards and the issue's spec) and fixes what it finds, opens a PR, runs review rounds with a fresh `merge-reviewer` until one is clean, and merges. Each PR review runs `ponytail-review` (bugs, safety, load, missing tests, code that shouldn't be there) with the issue, plus `security-review` when the round's change touches a security path (migrations, policies, auth, edge functions, payments, secrets); round 1 also gives each acceptance criterion a verdict, met or not met, with its evidence. Every finding the change causes blocks the merge; a finding it did not cause needs an open issue. A `pr-reviewer` must report REVIEW CLEAN before the PR opens and a `merge-reviewer` before it merges, because a review gate enforces both.
 - **shipmaster** runs `ship` for a batch of issues, one at a time or several at once. As soon as a ship merges, it starts the next unblocked issue. It only coordinates; the ships do the work.
 - **opencode-worker** runs DeepSeek through opencode, only when you ask for it by name; `ship` and `shipmaster` never call it. It tells whether a run is done, stuck, looping or never started.
 - **worker-routing** picks the Claude model and effort for builds, fixes, reviewers and merges, from a log of how each tier did on earlier tasks, and adds to that log when the worker finishes.
@@ -67,6 +67,7 @@ You also need:
 
 - Claude Code with the Agent and SendMessage tools;
 - `gh`, signed in, `git` and Python 3;
-- the `tdd`, `code-review` and `commentdiet` skills and the ponytail plugin (for `ponytail-review`), which `ship` calls.
+- the `tdd`, `code-review` and `commentdiet` skills and the ponytail plugin (for `ponytail-review`), which `ship` calls;
+- the `pr-reviewer` and `merge-reviewer` agents and the review-gate hooks in `~/.claude`, which this repository does not ship.
 
 Run the shipmaster from a session in auto permission mode.
