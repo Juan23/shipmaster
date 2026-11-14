@@ -44,7 +44,7 @@ python3 ~/.claude/skills/worker-routing/perf.py route --type coding --complexity
 python3 ~/.claude/skills/worker-routing/perf.py stats
 ```
 
-The tiers, cheapest first, are `sonnet-medium`, `sonnet-high`, `opus-medium`, `opus-high` and `opus-xhigh`. `haiku-medium` sits below them only for audits and research, and for cleanup, merge and simple coding below complexity 2.5. `opus-high` (Opus 5.5, high effort) also does every PR review. They are subagent definitions in `agents/`. `skills/worker-routing/SKILL.md` has the full routing rules.
+The tiers, cheapest first, are `sonnet-medium`, `sonnet-high`, `opus-medium`, `opus-high` and `opus-xhigh`. `haiku-medium` sits below them only for audits and research, and for cleanup, merge and simple coding below complexity 2.5. PR reviews run on the `pr-reviewer` and `merge-reviewer` agents (current Opus, high effort), which the review gate requires. The tiers are subagent definitions in `agents/`. `skills/worker-routing/SKILL.md` has the full routing rules.
 
 The log has one JSON line per worker and per rework, and is shared by every project on the machine: `~/.claude/skills/worker-routing/agent-performance-log.jsonl`. It never goes in this repo, and `.gitignore` blocks it if it ends up here.
 
