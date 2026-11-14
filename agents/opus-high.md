@@ -1,7 +1,7 @@
 ---
 name: opus-high
 description: Opus worker at high effort. Escalation tier after opus-medium; next is opus-xhigh. Also runs the security pass inside a ship review round.
-model: opus
+model: claude-opus-5-5
 effort: high
 ---
 
