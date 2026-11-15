@@ -8,7 +8,7 @@ from datetime import date
 
 MODELS = {"haiku": "haiku-5.5", "sonnet": "sonnet-5.5", "opus": "opus-5.5"}
 EFFORTS = ["low", "medium", "high", "xhigh", "max", "unknown"]
-TYPES = ["audit", "merge", "cleanup", "coding", "bug-diagnosis", "harness-build", "device-run", "harness-fix", "review"]
+TYPES = ["audit", "design", "merge", "cleanup", "coding", "bug-diagnosis", "harness-build", "device-run", "harness-fix", "review"]
 LEGACY_TYPES = ["hosted-harness"]  # pre-split rows; readable in stats, not accepted by add/route
 PLATFORMS = ["ios", "android", "both", "none"]
 OUTCOMES = ["pass", "partial", "fail"]
