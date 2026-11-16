@@ -1,0 +1,142 @@
+#!/bin/bash
+# Attack round: cheap read-only reviewers (DeepSeek attackers + agy Argon) on the committed branch,
+# before the Claude pr-reviewer. Always finishes within the time limit, with whatever arrived.
+# Usage: attack-round.sh --base <ref> [--focus security,failure,timing] [--out <dir>]
+set -u
+HERE="$(cd "$(dirname "$0")" && pwd)"
+OPENCODE_BIN="${OPENCODE_BIN:-opencode}"
+AGY_BIN="${AGY_BIN:-agy}"
+DS_MODEL="opencode-go/deepseek-v4.1-flash#high"
+ARGON="gemini-4-argon-high"
+HYDROGEN="gemini-4-hydrogen-high"
+LIMIT="${ATTACK_LIMIT:-1200}"
+PING_LIMIT="${PING_LIMIT:-120}"
+TIMED_OUT=142 # exit status of a process killed by the perl alarm (128 + SIGALRM)
+
+BASE="" FOCUS="security,failure,timing" OUT=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --base) BASE="$2"; shift 2;;
+    --focus) FOCUS="$2"; shift 2;;
+    --out) OUT="$2"; shift 2;;
+    *) echo "unknown option: $1" >&2; exit 2;;
+  esac
+done
+[ -n "$BASE" ] || { echo "usage: attack-round.sh --base <ref> [--focus a,b] [--out dir]" >&2; exit 2; }
+
+REPO="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "not in a git repository" >&2; exit 2; }
+git -C "$REPO" diff --quiet HEAD || { echo "commit your changes first: the round reviews a commit" >&2; exit 2; }
+SHA="$(git -C "$REPO" rev-parse HEAD)"
+git -C "$REPO" rev-parse --verify -q "$BASE^{commit}" >/dev/null || { echo "unknown base: $BASE" >&2; exit 2; }
+OUT="${OUT:-${TMPDIR:-/tmp}/attack-round-${SHA:0:8}}"
+mkdir -p "$OUT"
+WT="$OUT/wt"
+
+# Attackers may write files despite the prompt; a throwaway worktree keeps that away from the branch.
+git -C "$REPO" worktree add -q --detach "$WT" "$SHA" || exit 2
+cleanup() { git -C "$REPO" worktree remove --force "$WT" 2>/dev/null; }
+trap cleanup EXIT
+
+# Runs a command in its own process group and kills the whole group at the limit, so opencode's child
+# server cannot outlive it. `timeout` is not installed on every Mac; perl is. Closed stdin: opencode hangs on an open one.
+limited() {
+  local secs="$1"; shift
+  perl -e '
+    my $secs = shift;
+    my $pid = fork() // exit 1;
+    if ($pid == 0) { setpgrp(0, 0); exec @ARGV or exit 127; }
+    local $SIG{ALRM} = sub { kill "KILL", -$pid; waitpid($pid, 0); exit 142; };
+    alarm $secs;
+    waitpid($pid, 0);
+    exit($? & 127 ? 128 + ($? & 127) : $? >> 8);
+  ' "$secs" "$@" < /dev/null
+}
+
+prompt_for() { # prompt_for <focus>
+  printf 'FOCUS: %s\n\n' "$1"
+  sed -e "s/{{BASE}}/$BASE/g" "$HERE/prompts/common.md"
+  echo
+  cat "$HERE/prompts/$1.md"
+}
+
+ds_ping() { limited "$PING_LIMIT" "$OPENCODE_BIN" run --standalone --format json -m "$DS_MODEL" "Reply with just: pong" 2>/dev/null | grep -q pong; }
+agy_ping() { limited "$PING_LIMIT" "$AGY_BIN" -p "Reply with just: pong" --model "$ARGON" --print-timeout "${PING_LIMIT}s" 2>/dev/null | grep -q pong; }
+
+run_ds() { # run_ds <focus>: writes ds-<focus>.status and ds-<focus>.md
+  local f="$1" log="$OUT/ds-$1.jsonl" code
+  (cd "$WT" && limited "$LIMIT" "$OPENCODE_BIN" run --standalone --format json -m "$DS_MODEL" "$(prompt_for "$f")" > "$log" 2> "$OUT/ds-$f.err")
+  code=$?
+  # The last text event is the final answer; earlier ones are narration between tool calls.
+  jq -rs 'map(select(.type == "text")) | last | .part.text // empty' "$log" 2>/dev/null > "$OUT/ds-$f.md"
+  if [ "$code" = "$TIMED_OUT" ]; then echo timeout
+  elif [ "$code" = 0 ] && tail -n 1 "$log" | jq -e '.type == "step_finish" and .part.reason == "stop"' >/dev/null 2>&1; then echo done
+  else echo "failed (exit $code)"; fi > "$OUT/ds-$f.status"
+}
+
+DENIED=3 # agy_once: headless agy refused a tool, which ends its run with no answer
+
+agy_once() { # agy_once <model> <seconds> [note]: 0 with the answer in agy.md, DENIED, TIMED_OUT, or another failure code
+  # stream-json keeps each tool call in agy.jsonl, so a refused command can be named in the retry.
+  (cd "$WT" && limited "$2" "$AGY_BIN" -p "$(sed -e "s/{{BASE}}/$BASE/g" "$HERE/prompts/common.md"; echo; cat "$HERE/prompts/agy.md"; echo "${3:-}")" \
+    --model "$1" --mode plan --print-timeout "$(($2 - 30))s" --output-format stream-json > "$OUT/agy.jsonl" 2> "$OUT/agy.err")
+  local code=$? result
+  [ "$code" = "$TIMED_OUT" ] && return "$code"
+  grep -q 'print_timeout\|print timeout' "$OUT/agy.err" 2>/dev/null && return "$TIMED_OUT"
+  result="$(grep '"event":"result"' "$OUT/agy.jsonl" | tail -n 1)"
+  echo "$result" | jq -r '.result.response | select(. != null and . != "")' 2>/dev/null > "$OUT/agy.md"
+  [ -s "$OUT/agy.md" ] && return 0
+  echo "$result" | jq -r '.result.denied_actions // [] | map(.action) | unique | join(",")' 2>/dev/null > "$OUT/agy.denied"
+  [ -s "$OUT/agy.denied" ] && return "$DENIED"
+  [ "$code" = 0 ] && return 1
+  return "$code"
+}
+
+run_agy() {
+  # Argon first. A refused command retries once on Argon, naming the command; a fast failure (quota, error)
+  # retries once on Hydrogen; a timeout does not retry. Every retry gets only the time left.
+  local code refused left started=$SECONDS
+  agy_once "$ARGON" "$LIMIT"; code=$?
+  if [ "$code" = 0 ]; then echo "done ($ARGON)" > "$OUT/agy.status"; return; fi
+  if [ "$code" = "$TIMED_OUT" ]; then echo timeout > "$OUT/agy.status"; return; fi
+  left=$((LIMIT - (SECONDS - started)))
+  if [ "$code" = "$DENIED" ]; then
+    refused="$(jq -r '.. | .CommandLine? // empty' "$OUT/agy.jsonl" 2>/dev/null | tail -n 1)"
+    if [ "$left" -gt 120 ]; then
+      agy_once "$ARGON" "$left" "Your last run was stopped because this command was refused: ${refused:-unknown}. Do not use * or ? wildcards in shell commands; name folders instead, or use your built-in search tools."
+      code=$?
+      [ "$code" = 0 ] && { echo "done ($ARGON, after a refused command)" > "$OUT/agy.status"; return; }
+    fi
+    if [ "$code" = "$TIMED_OUT" ]; then echo timeout; else echo "failed (denied: $(cat "$OUT/agy.denied" 2>/dev/null))"; fi > "$OUT/agy.status"
+    return
+  fi
+  cp "$OUT/agy.err" "$OUT/agy-argon.err" 2>/dev/null
+  agy_once "$HYDROGEN" "$left"; code=$?
+  if [ "$code" = 0 ]; then echo "done ($HYDROGEN, after Argon failed)" > "$OUT/agy.status"
+  elif [ "$code" = "$TIMED_OUT" ]; then echo timeout > "$OUT/agy.status"
+  else echo "failed (exit $code)" > "$OUT/agy.status"; fi
+}
+
+FOCUSES="$(echo "$FOCUS" | tr ',' ' ')"
+for f in $FOCUSES; do [ -f "$HERE/prompts/$f.md" ] || { echo "no prompt for focus: $f" >&2; exit 2; }; done
+
+ds_ping && DS_UP=1 || DS_UP=0
+agy_ping && AGY_UP=1 || AGY_UP=0
+
+for f in $FOCUSES; do
+  if [ "$DS_UP" = 1 ]; then run_ds "$f" & else echo "skipped (ping failed)" > "$OUT/ds-$f.status"; fi
+done
+if [ "$AGY_UP" = 1 ]; then run_agy & else echo "skipped (ping failed)" > "$OUT/agy.status"; fi
+wait
+
+{
+  echo "# Attack round on ${SHA:0:8} (base $BASE)"
+  echo
+  for f in $FOCUSES; do echo "- deepseek-$f: $(cat "$OUT/ds-$f.status")"; done
+  echo "- agy: $(cat "$OUT/agy.status")"
+  for f in $FOCUSES; do
+    [ -s "$OUT/ds-$f.md" ] && { echo; echo "## deepseek-$f"; echo; cat "$OUT/ds-$f.md"; }
+  done
+  [ -s "$OUT/agy.md" ] && { echo; echo "## agy"; echo; cat "$OUT/agy.md"; }
+} > "$OUT/findings.md"
+sed -n '1,/^$/p;/^- /p' "$OUT/findings.md" | grep '^-\|^#'
+echo "findings: $OUT/findings.md"
