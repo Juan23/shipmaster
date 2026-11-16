@@ -23,10 +23,11 @@ fi
 focus=$(echo "$prompt" | sed -n 's/^FOCUS: //p')
 echo '{"type":"step_start","part":{}}'
 echo '{"type":"text","part":{"text":"Reading the diff first."}}'
-printf '{"type":"text","part":{"text":"DS finding for %s\\nScenario: two lines\\nATTACK DONE"}}\n' "$focus"
+range=$(echo "$prompt" | grep -o 'commit in [^ ]*\.\.HEAD' | head -n 1)
+printf '{"type":"text","part":{"text":"DS finding for %s (%s)\\nScenario: two lines\\nATTACK DONE"}}\n' "$focus" "$range"
 echo '{"type":"step_finish","part":{"reason":"stop"}}'
 EOF
-# Fake agy (stream-json): FAKE_ARGON = ok | quota | hang | denied. Hydrogen always answers.
+# Fake agy (stream-json): FAKE_ARGON = ok | quota | hang | print-timeout | denied | denied-once. Hydrogen always answers.
 cat > "$T/bin/agy" <<'EOF'
 #!/bin/bash
 model=""; prompt=""
@@ -55,7 +56,6 @@ EOF
 chmod +x "$T/bin/opencode" "$T/bin/agy"
 export OPENCODE_BIN="$T/bin/opencode" AGY_BIN="$T/bin/agy"
 
-# A repo with a base commit and one change on top.
 R="$T/repo"
 git init -q "$R" && cd "$R" || exit 1
 git config user.email t@t && git config user.name t
@@ -111,6 +111,15 @@ run ds-down FAKE_DS=ping-fail
 F="$T/out-ds-down/findings.md"
 grep -q "deepseek-security: skipped" "$F" && pass "failed ping skips DeepSeek" || fail "DeepSeek not skipped on failed ping"
 grep -q "AGY finding" "$F" && pass "agy still runs when DeepSeek is down" || fail "agy did not run"
+
+git branch -q base/x HEAD~1
+"$SCRIPT" --base base/x --focus security --out "$T/out-slash" > /dev/null 2>&1
+grep -q "commit in base/x..HEAD" "$T/out-slash/findings.md" && pass "a base with a slash reaches the prompt" || fail "base with a slash lost from the prompt"
+
+"$SCRIPT" --base HEAD~1 --focus security --out "$T/out-reuse" > /dev/null 2>&1
+env FAKE_DS=ping-fail FAKE_ARGON=hang ATTACK_LIMIT=3 "$SCRIPT" --base HEAD~1 --focus security --out "$T/out-reuse" > /dev/null 2>&1
+F="$T/out-reuse/findings.md"
+! grep -q "DS finding\|AGY finding" "$F" && pass "a reused output folder shows no earlier answers" || fail "earlier answers leaked into a reused folder"
 
 echo c >> f.txt
 run dirty

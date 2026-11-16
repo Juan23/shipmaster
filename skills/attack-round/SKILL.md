@@ -15,7 +15,7 @@ Owner's choice, 2026-11-17: cheap reviewers run **before** the Claude reviews, b
 
 ## Run
 
-From the branch's checkout, as a background command (it ends within about 22 minutes):
+From the branch's checkout, as a background command (it ends within about 22 minutes: 2 for the pings, 20 for the reviewers):
 
 ```bash
 ~/.claude/skills/attack-round/attack-round.sh --base origin/main --focus security,failure,timing --out "$SCRATCH/attack-round"
@@ -29,7 +29,7 @@ From the branch's checkout, as a background command (it ends within about 22 min
 
 ## Triage
 
-One Claude Sonnet worker (type `audit`, through `worker-routing`) checks each finding against the code:
+One Claude worker (type `audit`, tier from `worker-routing`) checks each finding against the code:
 - Keep it only if its scenario holds. Drop findings without a scenario.
 - For each kept finding, the builder writes the failing test it names (`/tdd`), then the fix.
 - All fixes land as one commit. Then spawn the `pr-reviewer` as usual. Never show it the attack findings: it must not have seen the work.
@@ -46,7 +46,7 @@ One line per reviewer (`deepseek-security`, `deepseek-failure`, `deepseek-timing
 
 ## Test
 
-`~/.claude/skills/attack-round/test-attack-round.sh` runs the script against fake opencode and agy binaries: success, a hang, an Argon quota error, an Argon timeout, a failed ping, and an uncommitted tree.
+`~/.claude/skills/attack-round/test-attack-round.sh` runs the script against fake opencode and agy binaries: success, a hang, an Argon quota error, an Argon timeout, agy's own time limit, refused commands, a failed ping, a base with a slash, a reused output folder, and an uncommitted tree.
 
 ## Revert
 
@@ -56,12 +56,14 @@ Everything this added, and how to undo each part (about two minutes):
    ```bash
    rm -rf ~/Projects/shipmaster/skills/attack-round ~/.claude/skills/attack-round
    ```
-2. In `~/Projects/shipmaster/skills/worker-routing/SKILL.md`, "Which work comes here": replace the attack-round sentence with the original:
-   > DeepSeek, opencode and the arena are disabled until the owner says otherwise (owner, 2026-11-15): never call the `opencode-worker` skill.
-3. In `~/Projects/shipmaster/skills/opencode-worker/SKILL.md`, restore the original description and banner:
-   > description: DISABLED by the owner on 2026-11-15 until further notice. Do not load or use; workers are Claude subagents (worker-routing). Formerly ran opencode (DeepSeek) workers and the 3-worker arena.
+2. In the `~/Projects/shipmaster` checkout, two files carried uncommitted local edits on 2026-11-17 that are not in this repo's history. If they are still there, put back their earlier local text:
+   - `skills/worker-routing/SKILL.md`, "Which work comes here": replace the sentence that names `attack-round` with:
+     > DeepSeek, opencode and the arena are disabled until the owner says otherwise (owner, 2026-11-15): never call the `opencode-worker` skill.
+   - `skills/opencode-worker/SKILL.md`: restore the description and banner:
+     > description: DISABLED by the owner on 2026-11-15 until further notice. Do not load or use; workers are Claude subagents (worker-routing). Formerly ran opencode (DeepSeek) workers and the 3-worker arena.
 
-   > **DISABLED (owner, 2026-11-15, until further notice).** Do not run opencode or DeepSeek, and do not run an arena. Every worker is a Claude subagent picked by the `worker-routing` skill. The text below is kept only for when the owner turns this back on.
+     > **DISABLED (owner, 2026-11-15, until further notice).** Do not run opencode or DeepSeek, and do not run an arena. Every worker is a Claude subagent picked by the `worker-routing` skill. The text below is kept only for when the owner turns this back on.
+3. In `README.md`, remove the `attack-round` bullet and its `ln -sfn` install line, and drop ", and as the read-only attackers of `attack-round`" from the opencode-worker bullet.
 4. Tell Claude "DeepSeek off" so it updates the `claude-workers-only` memory.
 
 Not part of this skill, and kept on revert: the agy fixes of 2026-11-16 (the Linear MCP server removed, `read_file` allowed in the `review-for-me` hook, `rg`/`nl`/`sed`/`awk` allowed in agy settings). Backups of those files from before the fixes are in `~/.gemini/backups-2026-11-16/`.

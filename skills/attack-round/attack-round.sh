@@ -1,6 +1,6 @@
 #!/bin/bash
 # Attack round: cheap read-only reviewers (DeepSeek attackers + agy Argon) on the committed branch,
-# before the Claude pr-reviewer. Always finishes within the time limit, with whatever arrived.
+# before the Claude pr-reviewer. Finishes within the ping limit plus the time limit, with whatever arrived.
 # Usage: attack-round.sh --base <ref> [--focus security,failure,timing] [--out <dir>]
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -30,6 +30,8 @@ SHA="$(git -C "$REPO" rev-parse HEAD)"
 git -C "$REPO" rev-parse --verify -q "$BASE^{commit}" >/dev/null || { echo "unknown base: $BASE" >&2; exit 2; }
 OUT="${OUT:-${TMPDIR:-/tmp}/attack-round-${SHA:0:8}}"
 mkdir -p "$OUT"
+# A reused folder must not show an earlier run's answers under this run's status lines.
+rm -f "$OUT"/ds-*.md "$OUT"/ds-*.status "$OUT"/agy.md "$OUT"/agy.status "$OUT"/agy.denied
 WT="$OUT/wt"
 
 # Attackers may write files despite the prompt; a throwaway worktree keeps that away from the branch.
@@ -52,9 +54,14 @@ limited() {
   ' "$secs" "$@" < /dev/null
 }
 
+common_prompt() { # bash substitution, not sed: a base such as origin/main breaks a sed pattern
+  local text; text="$(cat "$HERE/prompts/common.md")"
+  printf '%s\n' "${text//\{\{BASE\}\}/$BASE}"
+}
+
 prompt_for() { # prompt_for <focus>
   printf 'FOCUS: %s\n\n' "$1"
-  sed -e "s/{{BASE}}/$BASE/g" "$HERE/prompts/common.md"
+  common_prompt
   echo
   cat "$HERE/prompts/$1.md"
 }
@@ -77,7 +84,7 @@ DENIED=3 # agy_once: headless agy refused a tool, which ends its run with no ans
 
 agy_once() { # agy_once <model> <seconds> [note]: 0 with the answer in agy.md, DENIED, TIMED_OUT, or another failure code
   # stream-json keeps each tool call in agy.jsonl, so a refused command can be named in the retry.
-  (cd "$WT" && limited "$2" "$AGY_BIN" -p "$(sed -e "s/{{BASE}}/$BASE/g" "$HERE/prompts/common.md"; echo; cat "$HERE/prompts/agy.md"; echo "${3:-}")" \
+  (cd "$WT" && limited "$2" "$AGY_BIN" -p "$(common_prompt; echo; cat "$HERE/prompts/agy.md"; echo "${3:-}")" \
     --model "$1" --mode plan --print-timeout "$(($2 - 30))s" --output-format stream-json > "$OUT/agy.jsonl" 2> "$OUT/agy.err")
   local code=$? result
   [ "$code" = "$TIMED_OUT" ] && return "$code"
@@ -92,24 +99,26 @@ agy_once() { # agy_once <model> <seconds> [note]: 0 with the answer in agy.md, D
 }
 
 run_agy() {
-  # Argon first. A refused command retries once on Argon, naming the command; a fast failure (quota, error)
-  # retries once on Hydrogen; a timeout does not retry. Every retry gets only the time left.
-  local code refused left started=$SECONDS
+  # A timeout never retries; every retry gets only the time left.
+  local code refused denied left started=$SECONDS
   agy_once "$ARGON" "$LIMIT"; code=$?
   if [ "$code" = 0 ]; then echo "done ($ARGON)" > "$OUT/agy.status"; return; fi
   if [ "$code" = "$TIMED_OUT" ]; then echo timeout > "$OUT/agy.status"; return; fi
   left=$((LIMIT - (SECONDS - started)))
   if [ "$code" = "$DENIED" ]; then
     refused="$(jq -r '.. | .CommandLine? // empty' "$OUT/agy.jsonl" 2>/dev/null | tail -n 1)"
+    denied="$(cat "$OUT/agy.denied")"
     if [ "$left" -gt 120 ]; then
       agy_once "$ARGON" "$left" "Your last run was stopped because this command was refused: ${refused:-unknown}. Do not use * or ? wildcards in shell commands; name folders instead, or use your built-in search tools."
       code=$?
       [ "$code" = 0 ] && { echo "done ($ARGON, after a refused command)" > "$OUT/agy.status"; return; }
     fi
-    if [ "$code" = "$TIMED_OUT" ]; then echo timeout; else echo "failed (denied: $(cat "$OUT/agy.denied" 2>/dev/null))"; fi > "$OUT/agy.status"
+    if [ "$code" = "$TIMED_OUT" ]; then echo timeout; else echo "failed (denied: $denied)"; fi > "$OUT/agy.status"
     return
   fi
   cp "$OUT/agy.err" "$OUT/agy-argon.err" 2>/dev/null
+  # alarm 0 would turn the limit off, and print-timeout needs 30 s of margin.
+  if [ "$left" -le 120 ]; then echo "failed (Argon exit $code, too little time left for Hydrogen)" > "$OUT/agy.status"; return; fi
   agy_once "$HYDROGEN" "$left"; code=$?
   if [ "$code" = 0 ]; then echo "done ($HYDROGEN, after Argon failed)" > "$OUT/agy.status"
   elif [ "$code" = "$TIMED_OUT" ]; then echo timeout > "$OUT/agy.status"
@@ -119,8 +128,10 @@ run_agy() {
 FOCUSES="$(echo "$FOCUS" | tr ',' ' ')"
 for f in $FOCUSES; do [ -f "$HERE/prompts/$f.md" ] || { echo "no prompt for focus: $f" >&2; exit 2; }; done
 
-ds_ping && DS_UP=1 || DS_UP=0
-agy_ping && AGY_UP=1 || AGY_UP=0
+ds_ping & DS_PING=$!
+agy_ping & AGY_PING=$!
+wait "$DS_PING" && DS_UP=1 || DS_UP=0
+wait "$AGY_PING" && AGY_UP=1 || AGY_UP=0
 
 for f in $FOCUSES; do
   if [ "$DS_UP" = 1 ]; then run_ds "$f" & else echo "skipped (ping failed)" > "$OUT/ds-$f.status"; fi
@@ -138,5 +149,5 @@ wait
   done
   [ -s "$OUT/agy.md" ] && { echo; echo "## agy"; echo; cat "$OUT/agy.md"; }
 } > "$OUT/findings.md"
-sed -n '1,/^$/p;/^- /p' "$OUT/findings.md" | grep '^-\|^#'
+sed '/^## /,$d' "$OUT/findings.md" | grep '^-\|^#'
 echo "findings: $OUT/findings.md"
