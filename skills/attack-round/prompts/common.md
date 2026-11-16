@@ -3,6 +3,7 @@ The change is every commit in {{BASE}}..HEAD. Run `git diff {{BASE}}..HEAD`, the
 
 Rules:
 - Read only. Do not edit, create or delete files. Do not run builds, tests, apps, emulators or installs.
+- Shell commands: use only plain `git diff`, `git log`, `git show`, `git grep` and `rg`, one command per call, with no `;`, `&&` or pipes. Any other command is refused.
 - Report at most 5 findings, most severe first. Report only what you are confident is real.
 - Each finding must have all of these, or leave it out:
   1. Severity: high, medium or low.

@@ -19,6 +19,7 @@ if [[ "$prompt" == *"Reply with just: pong"* ]]; then
   [ "${FAKE_DS:-ok}" = ping-fail ] && { echo "Insufficient account funds" >&2; exit 1; }
   echo '{"type":"text","part":{"text":"pong"}}'; echo '{"type":"step_finish","part":{"reason":"stop"}}'; exit 0
 fi
+[[ " $* " == *" --agent attacker "* ]] && [ -f .opencode/agents/attacker.md ] || { echo '{"type":"text","part":{"text":"ran without the read-only agent"}}'; exit 1; }
 [ "${FAKE_DS:-ok}" = hang ] && sleep 37
 focus=$(echo "$prompt" | sed -n 's/^FOCUS: //p')
 echo '{"type":"step_start","part":{}}'
@@ -83,6 +84,12 @@ F="$T/out-ds-hang/findings.md"
 grep -q "deepseek-security: timeout" "$F" && pass "hang reported as timeout" || fail "hang not reported as timeout"
 pgrep -f "sleep 37" >/dev/null && fail "child processes of a timed-out attacker left running" || pass "a timed-out attacker leaves no child processes"
 grep -q "AGY finding from gemini-4-argon-high" "$F" && pass "other reviewers still reported" || fail "agy result lost when DeepSeek hung"
+
+perl -e 'setpgrp(0, 0); exec @ARGV' env FAKE_DS=hang ATTACK_LIMIT=30 "$SCRIPT" --base HEAD~1 --focus security --out "$T/out-stopped" > /dev/null 2>&1 &
+stopped=$!
+sleep 3; kill -TERM -"$stopped"; sleep 2
+pgrep -f "sleep 37" >/dev/null && fail "a stopped round left a reviewer running" || pass "stopping the round stops its reviewers"
+wait "$stopped" 2>/dev/null
 
 run argon-quota FAKE_ARGON=quota
 F="$T/out-argon-quota/findings.md"

@@ -24,7 +24,7 @@ From the branch's checkout, as a background command (it ends within about 22 min
 - It pings DeepSeek and agy first and skips any that do not answer.
 - Each reviewer gets 20 minutes (`ATTACK_LIMIT`, seconds; Argon alone needed almost 15 in testing). A stalled reviewer is killed with all its child processes, and the round goes on with what arrived.
 - agy uses Argon high. If Argon fails fast (quota, error), it retries once on Hydrogen high. If headless agy refuses a command (it refuses any `*` wildcard, and one refusal ends its run), it retries once on Argon and is told which command was refused. A timeout does not retry, and a retry only gets the time left.
-- Reviewers work in a throwaway worktree, which is deleted at the end.
+- Reviewers work in a throwaway worktree, which is deleted at the end. DeepSeek runs as the `attacker` agent (`opencode-attacker.md`, copied into that worktree): no file edits, and the shell runs only plain `git diff`, `git log`, `git show`, `git grep` and `rg`. agy runs in `--mode plan`.
 - Output: `findings.md` in the `--out` folder, with one status line per reviewer: `done`, `timeout`, `failed` or `skipped`. If every reviewer failed or was skipped, go straight to the `pr-reviewer`.
 
 ## Triage
@@ -46,7 +46,7 @@ One line per reviewer (`deepseek-security`, `deepseek-failure`, `deepseek-timing
 
 ## Test
 
-`~/.claude/skills/attack-round/test-attack-round.sh` runs the script against fake opencode and agy binaries: success, a hang, an Argon quota error, an Argon timeout, agy's own time limit, refused commands, a failed ping, a base with a slash, a reused output folder, and an uncommitted tree.
+`~/.claude/skills/attack-round/test-attack-round.sh` runs the script against fake opencode and agy binaries: success, a hang, an Argon quota error, an Argon timeout, agy's own time limit, refused commands, a failed ping, a base with a slash, a reused output folder, a stopped round, the read-only agent, and an uncommitted tree.
 
 ## Revert
 

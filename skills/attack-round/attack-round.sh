@@ -39,6 +39,8 @@ WT="$OUT/wt"
 git -C "$REPO" worktree add -q --detach "$WT" "$SHA" || exit 2
 cleanup() { git -C "$REPO" worktree remove --force "$WT" 2>/dev/null; }
 trap cleanup EXIT
+# opencode's default agent may edit and run any command; this project agent allows only read-only git and rg.
+mkdir -p "$WT/.opencode/agents" && cp "$HERE/opencode-attacker.md" "$WT/.opencode/agents/attacker.md" || exit 2
 
 # Runs a command in its own process group and kills the whole group at the limit, so opencode's child
 # server cannot outlive it. `timeout` is not installed on every Mac; perl is. Closed stdin: opencode hangs on an open one.
@@ -48,6 +50,7 @@ limited() {
     my $secs = shift;
     my $pid = fork() // exit 1;
     if ($pid == 0) { setpgrp(0, 0); exec @ARGV or exit 127; }
+    $SIG{TERM} = $SIG{HUP} = sub { kill "KILL", -$pid; exit 143; };  # a stopped round must not leave the model running
     local $SIG{ALRM} = sub { kill "KILL", -$pid; waitpid($pid, 0); exit 142; };
     alarm $secs;
     waitpid($pid, 0);
@@ -68,12 +71,12 @@ prompt_for() { # prompt_for <focus>
   cat "$HERE/prompts/$1.md"
 }
 
-ds_ping() { limited "$PING_LIMIT" "$OPENCODE_BIN" run --standalone --format json -m "$DS_MODEL" "Reply with just: pong" 2>/dev/null | grep -q pong; }
+ds_ping() { (cd "$WT" && limited "$PING_LIMIT" "$OPENCODE_BIN" run --standalone --format json --agent attacker -m "$DS_MODEL" "Reply with just: pong") 2>/dev/null | grep -q pong; }
 agy_ping() { limited "$PING_LIMIT" "$AGY_BIN" -p "Reply with just: pong" --model "$ARGON" --print-timeout "${PING_LIMIT}s" 2>/dev/null | grep -q pong; }
 
 run_ds() { # run_ds <focus>: writes ds-<focus>.status and ds-<focus>.md
   local f="$1" log="$OUT/ds-$1.jsonl" code
-  (cd "$WT" && limited "$LIMIT" "$OPENCODE_BIN" run --standalone --format json -m "$DS_MODEL" "$(prompt_for "$f")" > "$log" 2> "$OUT/ds-$f.err")
+  (cd "$WT" && limited "$LIMIT" "$OPENCODE_BIN" run --standalone --format json --agent attacker -m "$DS_MODEL" "$(prompt_for "$f")" > "$log" 2> "$OUT/ds-$f.err")
   code=$?
   # The last text event is the final answer; earlier ones are narration between tool calls.
   jq -rs 'map(select(.type == "text")) | last | .part.text // empty' "$log" 2>/dev/null > "$OUT/ds-$f.md"
