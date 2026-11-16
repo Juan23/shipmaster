@@ -24,7 +24,7 @@ focus=$(echo "$prompt" | sed -n 's/^FOCUS: //p')
 echo '{"type":"step_start","part":{}}'
 echo '{"type":"text","part":{"text":"Reading the diff first."}}'
 range=$(echo "$prompt" | grep -o 'commit in [^ ]*\.\.HEAD' | head -n 1)
-printf '{"type":"text","part":{"text":"DS finding for %s (%s)\\nScenario: two lines\\nATTACK DONE"}}\n' "$focus" "$range"
+printf '{"type":"text","part":{"text":"DS finding for %s (%s)\\nScenario: two lines\\n- bullet inside finding\\nATTACK DONE"}}\n' "$focus" "$range"
 echo '{"type":"step_finish","part":{"reason":"stop"}}'
 EOF
 # Fake agy (stream-json): FAKE_ARGON = ok | quota | hang | print-timeout | denied | denied-once. Hydrogen always answers.
@@ -93,7 +93,11 @@ F="$T/out-argon-hang/findings.md"
 grep -q "agy: timeout" "$F" && ! grep -q "hydrogen" "$F" && pass "an Argon timeout does not start Hydrogen" || fail "Argon timeout handling wrong"
 
 grep -q "Scenario: two lines" "$T/out-all-ok/findings.md" && ! grep -q "Reading the diff first" "$T/out-all-ok/findings.md" && pass "the whole final DeepSeek answer is kept, narration dropped" || fail "DeepSeek answer cut or narration kept"
+grep -q "bullet inside finding" "$T/out-all-ok/findings.md" && ! grep -q "bullet inside finding" "$T/all-ok.log" && pass "the printed summary shows status lines only" || fail "finding bullets leaked into the printed summary"
 grep -q "second line" "$T/out-all-ok/findings.md" && pass "the whole agy answer is kept" || fail "agy answer cut"
+
+run argon-quota-late FAKE_ARGON=quota ATTACK_LIMIT=100
+grep -q "agy: failed (Argon exit 1, too little time left for Hydrogen)" "$T/out-argon-quota-late/findings.md" && pass "no Hydrogen retry without enough time left" || fail "Hydrogen retried with too little time"
 
 run argon-denied FAKE_ARGON=denied
 F="$T/out-argon-denied/findings.md"

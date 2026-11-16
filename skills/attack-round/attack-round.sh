@@ -11,6 +11,7 @@ ARGON="gemini-4-argon-high"
 HYDROGEN="gemini-4-hydrogen-high"
 LIMIT="${ATTACK_LIMIT:-1200}"
 PING_LIMIT="${PING_LIMIT:-120}"
+MIN_RETRY_SECS=120 # alarm 0 would turn the limit off, and print-timeout needs 30 s of margin
 TIMED_OUT=142 # exit status of a process killed by the perl alarm (128 + SIGALRM)
 
 BASE="" FOCUS="security,failure,timing" OUT=""
@@ -56,6 +57,7 @@ limited() {
 
 common_prompt() { # bash substitution, not sed: a base such as origin/main breaks a sed pattern
   local text; text="$(cat "$HERE/prompts/common.md")"
+  shopt -u patsub_replacement 2>/dev/null # bash 5.2+ would expand & in the base
   printf '%s\n' "${text//\{\{BASE\}\}/$BASE}"
 }
 
@@ -100,25 +102,27 @@ agy_once() { # agy_once <model> <seconds> [note]: 0 with the answer in agy.md, D
 
 run_agy() {
   # A timeout never retries; every retry gets only the time left.
-  local code refused denied left started=$SECONDS
+  local code refused left started=$SECONDS
   agy_once "$ARGON" "$LIMIT"; code=$?
   if [ "$code" = 0 ]; then echo "done ($ARGON)" > "$OUT/agy.status"; return; fi
   if [ "$code" = "$TIMED_OUT" ]; then echo timeout > "$OUT/agy.status"; return; fi
   left=$((LIMIT - (SECONDS - started)))
   if [ "$code" = "$DENIED" ]; then
     refused="$(jq -r '.. | .CommandLine? // empty' "$OUT/agy.jsonl" 2>/dev/null | tail -n 1)"
-    denied="$(cat "$OUT/agy.denied")"
-    if [ "$left" -gt 120 ]; then
+    if [ "$left" -gt "$MIN_RETRY_SECS" ]; then
       agy_once "$ARGON" "$left" "Your last run was stopped because this command was refused: ${refused:-unknown}. Do not use * or ? wildcards in shell commands; name folders instead, or use your built-in search tools."
       code=$?
       [ "$code" = 0 ] && { echo "done ($ARGON, after a refused command)" > "$OUT/agy.status"; return; }
     fi
-    if [ "$code" = "$TIMED_OUT" ]; then echo timeout; else echo "failed (denied: $denied)"; fi > "$OUT/agy.status"
+    case "$code" in
+      "$TIMED_OUT") echo timeout;;
+      "$DENIED") echo "failed (denied: $(cat "$OUT/agy.denied"))";;
+      *) echo "failed (exit $code)";;
+    esac > "$OUT/agy.status"
     return
   fi
   cp "$OUT/agy.err" "$OUT/agy-argon.err" 2>/dev/null
-  # alarm 0 would turn the limit off, and print-timeout needs 30 s of margin.
-  if [ "$left" -le 120 ]; then echo "failed (Argon exit $code, too little time left for Hydrogen)" > "$OUT/agy.status"; return; fi
+  if [ "$left" -le "$MIN_RETRY_SECS" ]; then echo "failed (Argon exit $code, too little time left for Hydrogen)" > "$OUT/agy.status"; return; fi
   agy_once "$HYDROGEN" "$left"; code=$?
   if [ "$code" = 0 ]; then echo "done ($HYDROGEN, after Argon failed)" > "$OUT/agy.status"
   elif [ "$code" = "$TIMED_OUT" ]; then echo timeout > "$OUT/agy.status"
