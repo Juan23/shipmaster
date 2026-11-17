@@ -74,7 +74,8 @@ prompt_for() { # prompt_for <focus>
 }
 
 ds_ping() { (cd "$WT" && limited "$PING_LIMIT" "$OPENCODE_BIN" run --standalone --format json --agent attacker -m "$DS_MODEL" "Reply with just: pong") 2>/dev/null | grep -q pong; }
-agy_ping() { limited "$PING_LIMIT" "$AGY_BIN" -p "Reply with just: pong" --model "$PRIMARY" --print-timeout "${PING_LIMIT}s" 2>/dev/null | grep -q pong; }
+agy_ping_model() { limited "$PING_LIMIT" "$AGY_BIN" -p "Reply with just: pong" --model "$1" --print-timeout "${PING_LIMIT}s" 2>/dev/null | grep -q pong; }
+agy_ping() { agy_ping_model "$PRIMARY" || agy_ping_model "$BACKUP"; } # a primary out of quota still leaves the backup
 
 run_ds() { # run_ds <focus>: writes ds-<focus>.status and ds-<focus>.md
   local f="$1" log="$OUT/ds-$1.jsonl" code
@@ -127,7 +128,7 @@ run_agy() {
     return
   fi
   cp "$OUT/agy.err" "$OUT/agy-primary.err" 2>/dev/null
-  if [ "$left" -le "$MIN_RETRY_SECS" ]; then echo "failed (exit $code, too little time left for $BACKUP)" > "$OUT/agy.status"; return; fi
+  if [ "$left" -le "$MIN_RETRY_SECS" ]; then echo "failed ($PRIMARY exit $code, too little time left for $BACKUP)" > "$OUT/agy.status"; return; fi
   agy_once "$BACKUP" "$left"; code=$?
   if [ "$code" = 0 ]; then echo "done ($BACKUP, after $PRIMARY failed)" > "$OUT/agy.status"
   elif [ "$code" = "$TIMED_OUT" ]; then echo timeout > "$OUT/agy.status"

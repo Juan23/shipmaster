@@ -15,14 +15,14 @@ Owner's choice, 2026-11-17: cheap reviewers run **before** the Claude reviews, b
 
 ## Run
 
-From the branch's checkout, as a background command (it ends within about 22 minutes: 2 for the pings, 20 for the reviewers):
+From the branch's checkout, as a background command (it ends within about 24 minutes: up to 4 for the pings, 20 for the reviewers):
 
 ```bash
 ~/.claude/skills/attack-round/attack-round.sh --base origin/main --focus security,failure,timing --out "$SCRATCH/attack-round"
 ```
 
-- It pings DeepSeek and agy first and skips any that do not answer.
-- Each reviewer gets 20 minutes (`ATTACK_LIMIT`, seconds; Argon high needed 15 to 20 in testing, Hydrogen high 4). A stalled reviewer is killed with all its child processes, and the round goes on with what arrived.
+- It pings DeepSeek and agy first and skips any that do not answer. agy counts as up if its primary or its backup model answers.
+- Each reviewer gets 20 minutes (`ATTACK_LIMIT`, seconds; Argon high needed 15 to 20 minutes in testing, Hydrogen high 4). A stalled reviewer is killed with all its child processes, and the round goes on with what arrived.
 - agy uses Hydrogen high (owner, 2026-11-17: it took 4 minutes on a review where Argon medium took 11.5 and Argon high timed out). If Hydrogen fails fast (quota, error), it retries once on Argon medium. If headless agy refuses a command (it refuses any `*` wildcard, and one refusal ends its run), it retries once on Hydrogen and is told which command was refused. A timeout does not retry, and a retry only gets the time left.
 - Reviewers work in a throwaway worktree, which is deleted at the end. DeepSeek runs as the `attacker` agent (`opencode-attacker.md`, copied into that worktree): it can only read and search files inside the worktree, with no shell, no edits and no web, so the script saves the diff to `.attack/diff.patch` for it. agy runs in `--mode plan` under its own command allow list.
 - Output: `findings.md` in the `--out` folder, with one status line per reviewer: `done`, `timeout`, `failed` or `skipped`. If every reviewer failed or was skipped, go straight to the `pr-reviewer`.

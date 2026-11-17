@@ -35,7 +35,10 @@ model=""; prompt=""
 while [ $# -gt 0 ]; do
   case "$1" in --model) model="$2"; shift 2;; -p) prompt="$2"; shift 2;; *) shift;; esac
 done
-if [[ "$prompt" == *"Reply with just: pong"* ]]; then echo pong; exit 0; fi
+if [[ "$prompt" == *"Reply with just: pong"* ]]; then
+  [ "$model" = gemini-4-hydrogen-high ] && [ "${FAKE_PRIMARY:-ok}" = quota ] && { echo 'AGY_ERROR: {"status":"RESOURCE_EXHAUSTED"}' >&2; exit 1; }
+  echo pong; exit 0
+fi
 if [ "$model" = gemini-4-hydrogen-high ]; then
   case "${FAKE_PRIMARY:-ok}" in
     quota) echo 'AGY_ERROR: {"status":"RESOURCE_EXHAUSTED"}' >&2; exit 1;;
@@ -104,7 +107,7 @@ grep -q "bullet inside finding" "$T/out-all-ok/findings.md" && ! grep -q "bullet
 grep -q "second line" "$T/out-all-ok/findings.md" && pass "the whole agy answer is kept" || fail "agy answer cut"
 
 run primary-quota-late FAKE_PRIMARY=quota ATTACK_LIMIT=100
-grep -q "agy: failed (exit 1, too little time left for gemini-4-argon-medium)" "$T/out-primary-quota-late/findings.md" && pass "no backup retry without enough time left" || fail "backup retried with too little time"
+grep -q "agy: failed (gemini-4-hydrogen-high exit 1, too little time left for gemini-4-argon-medium)" "$T/out-primary-quota-late/findings.md" && pass "no backup retry without enough time left" || fail "backup retried with too little time"
 
 run primary-denied FAKE_PRIMARY=denied
 F="$T/out-primary-denied/findings.md"
