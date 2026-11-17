@@ -133,7 +133,7 @@ run_agy() {
     esac > "$OUT/agy.status"
     return
   fi
-  cp "$OUT/agy.err" "$OUT/agy-primary.err" 2>/dev/null
+  cp "$OUT/agy.err" "$OUT/agy-$first.err" 2>/dev/null
   if [ -z "$next" ]; then echo "failed ($first exit $code)" > "$OUT/agy.status"; return; fi
   if [ "$left" -le "$MIN_RETRY_SECS" ]; then echo "failed ($first exit $code, too little time left for $next)" > "$OUT/agy.status"; return; fi
   agy_once "$next" "$left"; code=$?
