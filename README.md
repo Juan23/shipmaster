@@ -45,7 +45,7 @@ python3 ~/.claude/skills/worker-routing/perf.py route --type coding --complexity
 python3 ~/.claude/skills/worker-routing/perf.py stats
 ```
 
-The tiers, cheapest first, are `sonnet-medium`, `sonnet-high`, `opus-medium`, `opus-high` and `opus-xhigh`. `haiku-medium` sits below them only for audits and research, and for cleanup, merge and simple coding below complexity 2.5. `opus-high` (Opus 5.5, high effort) also does every PR review. They are subagent definitions in `agents/`. `skills/worker-routing/SKILL.md` has the full routing rules.
+The tiers, cheapest first, are `sonnet-medium`, `sonnet-high`, `opus-medium`, `opus-high` and `opus-xhigh`. `haiku-medium` sits below them only for audits and research, and for cleanup, merge and simple coding below complexity 2.5. PR reviews run on the `pr-reviewer` and `merge-reviewer` agents (current Opus, high effort), which the review gate requires. The tiers and the two reviewers are subagent definitions in `agents/`. `skills/worker-routing/SKILL.md` has the full routing rules.
 
 The log has one JSON line per worker and per rework, and is shared by every project on the machine: `~/.claude/skills/worker-routing/agent-performance-log.jsonl`. It never goes in this repo, and `.gitignore` blocks it if it ends up here.
 
@@ -72,3 +72,7 @@ You also need:
 - the `tdd`, `code-review` and `commentdiet` skills and the ponytail plugin (for `ponytail-review`), which `ship` calls.
 
 Run the shipmaster from a session in auto permission mode.
+
+## Review gate
+
+`agents/pr-reviewer.md` and `agents/merge-reviewer.md` are the two reviewer agents, installed next to the worker agents by the `ln -sf .../agents/*.md` line above. `hooks/review_gate.py` is a PreToolUse hook (matcher `Bash|Edit|Write|MultiEdit`) that blocks `gh pr create` until a `pr-reviewer` of the session reported REVIEW CLEAN for the commit, and `gh pr merge` until a `merge-reviewer` did for the pull request's head commit. Register it as `python3 ~/Projects/shipmaster/hooks/review_gate.py`; its tests run with `python3 hooks/test_review_gate.py`.
