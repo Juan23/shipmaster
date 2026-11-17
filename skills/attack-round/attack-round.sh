@@ -1,14 +1,14 @@
 #!/bin/bash
-# Attack round: cheap read-only reviewers (DeepSeek attackers + agy Argon) on the committed branch,
-# before the Claude pr-reviewer. Finishes within the ping limit plus the time limit, with whatever arrived.
+# Attack round: cheap read-only reviewers (DeepSeek attackers + agy Gemini) on the committed branch,
+# before the Claude pr-reviewer. Finishes within twice the ping limit plus the time limit, with whatever arrived.
 # Usage: attack-round.sh --base <ref> [--focus security,failure,timing] [--out <dir>]
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 OPENCODE_BIN="${OPENCODE_BIN:-opencode}"
 AGY_BIN="${AGY_BIN:-agy}"
 DS_MODEL="opencode-go/deepseek-v4.1-flash#high"
-ARGON="gemini-4-argon-high"
-HYDROGEN="gemini-4-hydrogen-high"
+PRIMARY="gemini-4-hydrogen-high" # 4 min against 11.5 for Argon medium on the same review
+BACKUP="gemini-4-argon-medium"
 LIMIT="${ATTACK_LIMIT:-1200}"
 PING_LIMIT="${PING_LIMIT:-120}"
 MIN_RETRY_SECS=120 # alarm 0 would turn the limit off, and print-timeout needs 30 s of margin
@@ -32,7 +32,7 @@ git -C "$REPO" rev-parse --verify -q "$BASE^{commit}" >/dev/null || { echo "unkn
 OUT="${OUT:-${TMPDIR:-/tmp}/attack-round-${SHA:0:8}}"
 mkdir -p "$OUT"
 # A reused folder must not show an earlier run's answers under this run's status lines.
-rm -f "$OUT"/ds-*.md "$OUT"/ds-*.status "$OUT"/agy.md "$OUT"/agy.status "$OUT"/agy.denied
+rm -f "$OUT"/ds-*.md "$OUT"/ds-*.status "$OUT"/agy.md "$OUT"/agy.status "$OUT"/agy.denied "$OUT"/agy.model
 WT="$OUT/wt"
 
 # Attackers may write files despite the prompt; a throwaway worktree keeps that away from the branch.
@@ -74,7 +74,12 @@ prompt_for() { # prompt_for <focus>
 }
 
 ds_ping() { (cd "$WT" && limited "$PING_LIMIT" "$OPENCODE_BIN" run --standalone --format json --agent attacker -m "$DS_MODEL" "Reply with just: pong") 2>/dev/null | grep -q pong; }
-agy_ping() { limited "$PING_LIMIT" "$AGY_BIN" -p "Reply with just: pong" --model "$ARGON" --print-timeout "${PING_LIMIT}s" 2>/dev/null | grep -q pong; }
+agy_ping_model() { limited "$PING_LIMIT" "$AGY_BIN" -p "Reply with just: pong" --model "$1" --print-timeout "${PING_LIMIT}s" 2>/dev/null | grep -q pong; }
+agy_ping() { # writes the first model that answers to agy.model; a primary that is down still leaves the backup
+  local m
+  for m in "$PRIMARY" "$BACKUP"; do agy_ping_model "$m" && { echo "$m" > "$OUT/agy.model"; return 0; }; done
+  return 1
+}
 
 run_ds() { # run_ds <focus>: writes ds-<focus>.status and ds-<focus>.md
   local f="$1" log="$OUT/ds-$1.jsonl" code
@@ -107,17 +112,19 @@ agy_once() { # agy_once <model> <seconds> [note]: 0 with the answer in agy.md, D
 
 run_agy() {
   # A timeout never retries; every retry gets only the time left.
-  local code refused left started=$SECONDS
-  agy_once "$ARGON" "$LIMIT"; code=$?
-  if [ "$code" = 0 ]; then echo "done ($ARGON)" > "$OUT/agy.status"; return; fi
+  local code refused left started=$SECONDS first next=""
+  first="$(cat "$OUT/agy.model")"
+  [ "$first" = "$PRIMARY" ] && next="$BACKUP"
+  agy_once "$first" "$LIMIT"; code=$?
+  if [ "$code" = 0 ]; then echo "done ($first)" > "$OUT/agy.status"; return; fi
   if [ "$code" = "$TIMED_OUT" ]; then echo timeout > "$OUT/agy.status"; return; fi
   left=$((LIMIT - (SECONDS - started)))
   if [ "$code" = "$DENIED" ]; then
     refused="$(jq -r '.. | .CommandLine? // empty' "$OUT/agy.jsonl" 2>/dev/null | tail -n 1)"
     if [ "$left" -gt "$MIN_RETRY_SECS" ]; then
-      agy_once "$ARGON" "$left" "Your last run was stopped because this command was refused: ${refused:-unknown}. Do not use * or ? wildcards in shell commands; name folders instead, or use your built-in search tools."
+      agy_once "$first" "$left" "Your last run was stopped because this command was refused: ${refused:-unknown}. Do not use * or ? wildcards in shell commands; name folders instead, or use your built-in search tools."
       code=$?
-      [ "$code" = 0 ] && { echo "done ($ARGON, after a refused command)" > "$OUT/agy.status"; return; }
+      [ "$code" = 0 ] && { echo "done ($first, after a refused command)" > "$OUT/agy.status"; return; }
     fi
     case "$code" in
       "$TIMED_OUT") echo timeout;;
@@ -126,10 +133,11 @@ run_agy() {
     esac > "$OUT/agy.status"
     return
   fi
-  cp "$OUT/agy.err" "$OUT/agy-argon.err" 2>/dev/null
-  if [ "$left" -le "$MIN_RETRY_SECS" ]; then echo "failed (Argon exit $code, too little time left for Hydrogen)" > "$OUT/agy.status"; return; fi
-  agy_once "$HYDROGEN" "$left"; code=$?
-  if [ "$code" = 0 ]; then echo "done ($HYDROGEN, after Argon failed)" > "$OUT/agy.status"
+  cp "$OUT/agy.err" "$OUT/agy-$first.err" 2>/dev/null
+  if [ -z "$next" ]; then echo "failed ($first exit $code)" > "$OUT/agy.status"; return; fi
+  if [ "$left" -le "$MIN_RETRY_SECS" ]; then echo "failed ($first exit $code, too little time left for $next)" > "$OUT/agy.status"; return; fi
+  agy_once "$next" "$left"; code=$?
+  if [ "$code" = 0 ]; then echo "done ($next, after $first failed)" > "$OUT/agy.status"
   elif [ "$code" = "$TIMED_OUT" ]; then echo timeout > "$OUT/agy.status"
   else echo "failed (exit $code)" > "$OUT/agy.status"; fi
 }
