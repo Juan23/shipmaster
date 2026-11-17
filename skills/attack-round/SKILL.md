@@ -36,7 +36,7 @@ One Claude worker (type `audit`, tier from `worker-routing`) checks each finding
 
 ## Why it stays
 
-Owner, 2026-11-17: "we'll keep the attackers." In a 10-pull-request trial, 70% to 100% of each reviewer's findings were real.
+Owner, 2026-11-17: "we'll keep the attackers." In a 10-pull-request trial, 72% to 100% of each reviewer's findings were real.
 
 ## Test
 
