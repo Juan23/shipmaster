@@ -28,7 +28,7 @@ range=$(echo "$prompt" | grep -o 'commit in [^ ]*\.\.HEAD' | head -n 1)
 printf '{"type":"text","part":{"text":"DS finding for %s (%s)\\nScenario: two lines\\n- bullet inside finding\\nATTACK DONE"}}\n' "$focus" "$range"
 echo '{"type":"step_finish","part":{"reason":"stop"}}'
 EOF
-# Fake agy (stream-json): FAKE_PRIMARY = ok | quota | hang | print-timeout | denied | denied-once. The backup model always answers.
+# Fake agy (stream-json): FAKE_PRIMARY = ok | quota | quota-run | down | hang | print-timeout | denied | denied-once. The backup model always answers.
 cat > "$T/bin/agy" <<'EOF'
 #!/bin/bash
 model=""; prompt=""
@@ -37,12 +37,13 @@ while [ $# -gt 0 ]; do
 done
 if [[ "$prompt" == *"Reply with just: pong"* ]]; then
   [ "$model" = gemini-4-hydrogen-high ] && [ "${FAKE_PRIMARY:-ok}" = quota ] && { echo 'AGY_ERROR: {"status":"RESOURCE_EXHAUSTED"}' >&2; exit 1; }
+  [ "$model" = gemini-4-hydrogen-high ] && [ "${FAKE_PRIMARY:-ok}" = down ] && sleep 30
   echo pong; exit 0
 fi
 if [ "$model" = gemini-4-hydrogen-high ]; then
   case "${FAKE_PRIMARY:-ok}" in
-    quota) echo 'AGY_ERROR: {"status":"RESOURCE_EXHAUSTED"}' >&2; exit 1;;
-    hang) sleep 30;;
+    quota|quota-run) echo 'AGY_ERROR: {"status":"RESOURCE_EXHAUSTED"}' >&2; exit 1;;
+    hang|down) sleep 30;;
     print-timeout) echo '{"event":"result","result":{"status":"ERROR","response":"","error":"print timeout after 14m30s"}}'
       echo 'AGY_ERROR: {"status":"DEADLINE_EXCEEDED","reason":"print_timeout"}' >&2; exit 1;;
     denied) echo '{"event":"result","result":{"status":"SUCCESS","response":"","denied_actions":[{"action":"command"}]}}'; exit 0;;
@@ -94,9 +95,16 @@ sleep 3; kill -TERM -"$stopped"; sleep 2
 pgrep -f "sleep 37" >/dev/null && fail "a stopped round left a reviewer running" || pass "stopping the round stops its reviewers"
 wait "$stopped" 2>/dev/null
 
-run primary-quota FAKE_PRIMARY=quota
+run primary-quota FAKE_PRIMARY=quota-run
 F="$T/out-primary-quota/findings.md"
 grep -q "AGY finding from gemini-4-argon-medium" "$F" && pass "a primary failure falls back to the backup model" || fail "no backup fallback"
+run primary-no-quota FAKE_PRIMARY=quota
+grep -q "agy: done (gemini-4-argon-medium)" "$T/out-primary-no-quota/findings.md" && pass "a primary out of quota at the ping goes straight to the backup" || fail "primary out of quota skipped agy"
+
+start=$(date +%s)
+run primary-down FAKE_PRIMARY=down PING_LIMIT=2 ATTACK_LIMIT=20
+took=$(( $(date +%s) - start ))
+grep -q "agy: done (gemini-4-argon-medium)" "$T/out-primary-down/findings.md" && [ "$took" -lt 15 ] && pass "a primary that hangs on its ping is skipped for the backup (${took}s)" || fail "hung primary still started (${took}s)"
 
 run primary-hang FAKE_PRIMARY=hang ATTACK_LIMIT=3
 F="$T/out-primary-hang/findings.md"
@@ -106,7 +114,7 @@ grep -q "Scenario: two lines" "$T/out-all-ok/findings.md" && ! grep -q "Reading 
 grep -q "bullet inside finding" "$T/out-all-ok/findings.md" && ! grep -q "bullet inside finding" "$T/all-ok.log" && pass "the printed summary shows status lines only" || fail "finding bullets leaked into the printed summary"
 grep -q "second line" "$T/out-all-ok/findings.md" && pass "the whole agy answer is kept" || fail "agy answer cut"
 
-run primary-quota-late FAKE_PRIMARY=quota ATTACK_LIMIT=100
+run primary-quota-late FAKE_PRIMARY=quota-run ATTACK_LIMIT=100
 grep -q "agy: failed (gemini-4-hydrogen-high exit 1, too little time left for gemini-4-argon-medium)" "$T/out-primary-quota-late/findings.md" && pass "no backup retry without enough time left" || fail "backup retried with too little time"
 
 run primary-denied FAKE_PRIMARY=denied
