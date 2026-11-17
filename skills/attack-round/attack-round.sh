@@ -39,8 +39,10 @@ WT="$OUT/wt"
 git -C "$REPO" worktree add -q --detach "$WT" "$SHA" || exit 2
 cleanup() { git -C "$REPO" worktree remove --force "$WT" 2>/dev/null; }
 trap cleanup EXIT
-# opencode's default agent may edit and run any command; this project agent allows only read-only git and rg.
-mkdir -p "$WT/.opencode/agents" && cp "$HERE/opencode-attacker.md" "$WT/.opencode/agents/attacker.md" || exit 2
+# opencode's default agent may edit and run any command; this project agent may only read inside the worktree,
+# so it gets the diff as a file instead of running git.
+mkdir -p "$WT/.opencode/agents" "$WT/.attack" && cp "$HERE/opencode-attacker.md" "$WT/.opencode/agents/attacker.md" || exit 2
+git -C "$REPO" diff "$BASE..$SHA" > "$WT/.attack/diff.patch" && git -C "$REPO" log --format='%h %s' "$BASE..$SHA" > "$WT/.attack/commits.txt" || exit 2
 
 # Runs a command in its own process group and kills the whole group at the limit, so opencode's child
 # server cannot outlive it. `timeout` is not installed on every Mac; perl is. Closed stdin: opencode hangs on an open one.

@@ -1,51 +1,24 @@
 ---
-description: Read-only attack-round reviewer. Cannot edit files or run anything but read-only git and rg.
+description: Read-only attack-round reviewer. Reads files in its folder; no shell, no edits, no web.
 mode: primary
 permissions:
-  - action: question
+  # Later rules win. Deny everything, then allow only reading inside the worktree.
+  - action: "*"
     resource: "*"
     effect: deny
-  - action: subagent
+  - action: read
     resource: "*"
-    effect: deny
-  - action: edit
+    effect: allow
+  - action: glob
     resource: "*"
-    effect: deny
-  - action: webfetch
+    effect: allow
+  - action: grep
     resource: "*"
-    effect: deny
-  - action: shell
+    effect: allow
+  - action: list
     resource: "*"
-    effect: deny
-  - action: shell
-    resource: "git diff*"
     effect: allow
-  - action: shell
-    resource: "git log*"
-    effect: allow
-  - action: shell
-    resource: "git show*"
-    effect: allow
-  - action: shell
-    resource: "git grep*"
-    effect: allow
-  - action: shell
-    resource: "rg *"
-    effect: allow
-  # Later rules win. These flags make an allowed command run a program or write a file.
-  - action: shell
-    resource: "*--pre*"
-    effect: deny
-  - action: shell
-    resource: "*-O*"
-    effect: deny
-  - action: shell
-    resource: "*--open-files-in-pager*"
-    effect: deny
-  - action: shell
-    resource: "*--output*"
-    effect: deny
-  - action: shell
-    resource: "*--ext-diff*"
+  - action: external_directory
+    resource: "*"
     effect: deny
 ---

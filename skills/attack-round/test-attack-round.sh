@@ -19,7 +19,7 @@ if [[ "$prompt" == *"Reply with just: pong"* ]]; then
   [ "${FAKE_DS:-ok}" = ping-fail ] && { echo "Insufficient account funds" >&2; exit 1; }
   echo '{"type":"text","part":{"text":"pong"}}'; echo '{"type":"step_finish","part":{"reason":"stop"}}'; exit 0
 fi
-[[ " $* " == *" --agent attacker "* ]] && [ -f .opencode/agents/attacker.md ] || { echo '{"type":"text","part":{"text":"ran without the read-only agent"}}'; exit 1; }
+[[ " $* " == *" --agent attacker "* ]] && [ -f .opencode/agents/attacker.md ] && grep -q '^+b' .attack/diff.patch || { echo '{"type":"text","part":{"text":"ran without the read-only agent"}}'; exit 1; }
 [ "${FAKE_DS:-ok}" = hang ] && sleep 37
 focus=$(echo "$prompt" | sed -n 's/^FOCUS: //p')
 echo '{"type":"step_start","part":{}}'
