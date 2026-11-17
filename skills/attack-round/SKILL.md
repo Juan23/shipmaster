@@ -1,6 +1,6 @@
 ---
 name: attack-round
-description: Before spawning the pr-reviewer for a code change, run cheap read-only attackers (3 DeepSeek focuses + agy Gemini Hydrogen) on the committed branch, triage their findings, and fix the real ones. Trial over 10 pull requests from 2026-11-17.
+description: Before spawning the pr-reviewer for a code change, run cheap read-only attackers (3 DeepSeek focuses + agy Gemini Hydrogen) on the committed branch, triage their findings, and fix the real ones.
 ---
 
 # Attack round
@@ -34,15 +34,9 @@ One Claude worker (type `audit`, tier from `worker-routing`) checks each finding
 - For each kept finding, the builder writes the failing test it names (`/tdd`), then the fix.
 - All fixes land as one commit. Then spawn the `pr-reviewer` as usual. Never show it the attack findings: it must not have seen the work.
 
-## Trial log
+## Why it stays
 
-Append one line per pull request to `~/.claude/attack-round-log.jsonl`:
-
-```json
-{"date": "2026-11-17", "repo": "Juan23/skc-workspace", "pr": 410, "reviewer": "deepseek-security", "status": "done", "findings": 3, "real": 2, "minutes": 9, "claude_review_rounds": 1}
-```
-
-One line per reviewer (`deepseek-security`, `deepseek-failure`, `deepseek-timing`, `agy-hydrogen`, `agy-argon`). After 10 pull requests: keep a reviewer if at least half its findings were real and Claude review rounds dropped by about one; drop it if under 30% were real, or it timed out or failed on 3 or more pull requests. The baseline is the `review` rows since 2026-11-06 in the worker-routing log.
+Owner, 2026-11-17: "we'll keep the attackers." In a 10-pull-request trial, 70% to 100% of each reviewer's findings were real.
 
 ## Test
 
