@@ -77,7 +77,8 @@ Run the shipmaster from a session in auto permission mode.
 
 - `agents/pr-reviewer.md` and `agents/merge-reviewer.md` are the two reviewer agents. The `ln -sf .../agents/*.md` line above installs them next to the worker agents.
 - `hooks/review_gate.py` is a PreToolUse hook (matcher `Bash|Edit|Write|MultiEdit`). It blocks `gh pr create` until a `pr-reviewer` of the session reported REVIEW CLEAN for the commit, and `gh pr merge` until a `merge-reviewer` did for the pull request's head commit.
-- It is the owner's gate plus one fix: after a leading `cd`, only `&&` counts, because a pipe runs the `cd` in a subshell.
-- The gate protects only `~/.claude/hooks/review_gate.py`, its test file and `~/.claude/settings.json`, and follows links. So the cloud sessions of skc-workspace link it to `~/.claude/hooks/review_gate.py` (its `install-shipmaster.sh` does this) and register it at that path.
+- After a leading `cd`, only `&&` counts, because a pipe runs the `cd` in a subshell.
+- The gate protects only `~/.claude/hooks/review_gate.py`, its test file and `~/.claude/settings.json`, and follows links. So skc-workspace's `install-shipmaster.sh` links it to `~/.claude/hooks/review_gate.py` in cloud sessions.
+- A cloud session is gated only when skc-workspace's `.claude/settings.json` has a PreToolUse entry that runs `.claude/hooks/review-gate-cloud.sh`. That entry needs the owner's approval; until it exists, cloud sessions are not gated.
 - On the owner's Macs the owner's own copy in `~/.claude/hooks` stays; do not replace it with a link.
 - Tests: `python3 hooks/test_review_gate.py`.
