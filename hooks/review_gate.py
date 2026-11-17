@@ -243,6 +243,7 @@ def read_shell(command, cwd):
         if verb == "cd":  # only a leading `cd <plain path> &&` with no `||` after it, so it surely ran
             allowed &= (n == 0 and len(rest) == 1 and bool(re.match(r"(/|~/|\./|~$)", rest[0]))  # CDPATH
                         and ".." not in rest[0].split("/")
+                        and separator in ("&&", "")  # a pipe runs the cd in a subshell
                         and all(s in ("&&", "|", "") for _, _, s in commands))  # nothing runs after a failed cd
             here = os.path.join(here, rest[0]) if rest else here
             continue

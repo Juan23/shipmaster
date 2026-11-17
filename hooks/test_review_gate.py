@@ -22,9 +22,9 @@ class ReviewGate(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def run_gate(self, tool, tool_input, env=None):
+    def run_gate(self, tool, tool_input, env=None, cwd=None):
         hook_input = {"hook_event_name": "PreToolUse", "tool_name": tool, "tool_input": tool_input,
-                      "cwd": self.repo, "transcript_path": self.transcript}
+                      "cwd": cwd or self.repo, "transcript_path": self.transcript}
         p = subprocess.run([sys.executable, GATE], input=json.dumps(hook_input),
                            capture_output=True, text=True, env=dict(os.environ, **(env or {})))
         return p.returncode, p.stderr
@@ -400,6 +400,29 @@ class ReviewGate(unittest.TestCase):
                         "cat <<EOF; echo \"\n\" ; rm ~/.claude/hooks/review_gate.py ; echo \"\nEOF\n\"",
                         "cd /nonexistent && true ; rm ../../.claude/hooks/review_gate.py"):
             self.assertEqual(self.create(command), 2, command)
+
+    # Mistake caught: `cd x | rm review_gate.py` passes because a pipe runs the cd in a subshell,
+    # so the rm still hits the gate's own folder.
+    def test_cd_in_a_pipe_does_not_move_the_folder(self):
+        home = os.path.join(self.tmp.name, "home")
+        hooks = os.path.join(home, ".claude", "hooks")
+        os.makedirs(hooks)
+        for command in ("cd /tmp | rm review_gate.py", "cd /tmp ; rm review_gate.py"):
+            self.assertEqual(self.run_gate("Bash", {"command": command}, {"HOME": home}, hooks)[0], 2, command)
+
+    # Mistake caught: the cloud installs the gate as a link into the clone, and the clone file
+    # stays editable because only the link's own path is guarded.
+    def test_link_to_the_clone_protects_the_clone_file(self):
+        home = os.path.join(self.tmp.name, "home")
+        os.makedirs(os.path.join(home, ".claude", "hooks"))
+        clone = os.path.join(self.tmp.name, "clone")
+        os.makedirs(clone)
+        target = os.path.join(clone, "review_gate.py")
+        open(target, "w").close()
+        os.symlink(target, os.path.join(home, ".claude", "hooks", "review_gate.py"))
+        env = {"HOME": home}
+        self.assertEqual(self.run_gate("Write", {"file_path": target, "content": ""}, env)[0], 2)
+        self.assertEqual(self.run_gate("Bash", {"command": f"rm {target}"}, env)[0], 2)
 
     # Mistake caught: a write outside ~/.claude (another settings.json, a copy of the gate) is blocked.
     def test_writes_elsewhere_pass(self):
