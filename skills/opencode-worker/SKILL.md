@@ -12,7 +12,8 @@ Workers are Claude subagents that `worker-routing` picks. DeepSeek runs only as 
 | Role | Who | Does |
 |---|---|---|
 | Orchestrator | Claude (this session) | Splits the work, briefs the worker, watches it, checks its result. |
-| Worker | DeepSeek via opencode | Writes the code and runs the checks it is given. |
+| Attacker | DeepSeek via opencode | Reads a committed branch and reports findings, run by `attack-round.sh`. |
+| Worker, only when the owner names DeepSeek | DeepSeek via opencode | Writes the code and runs the checks it is given. |
 | Reviewer | Claude | `/code-review` and `/commentdiet` before a PR opens; `/ponytail-review` on the PR. |
 | Merger | Claude | Merges branches and PRs. |
 

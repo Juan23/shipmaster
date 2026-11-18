@@ -50,7 +50,7 @@ Everything this added, and how to undo each part (about two minutes):
    ```bash
    rm -rf ~/Projects/shipmaster/skills/attack-round ~/.claude/skills/attack-round
    ```
-2. In `README.md`, remove the `attack-round` bullet and its `ln -sfn` install line, and drop ", and as the read-only attackers of `attack-round`" from the opencode-worker bullet.
+2. Remove every other mention of the attackers: `git grep -n -i attack -- README.md skills/opencode-worker skills/worker-routing` lists them.
 3. Tell Claude "attackers off" so it updates the `claude-workers-only` memory.
 
 Not part of this skill, and kept on revert: the agy fixes of 2026-11-16 (the Linear MCP server removed, `read_file` allowed in the `review-for-me` hook, `rg`/`nl`/`sed`/`awk` allowed in agy settings). Backups of those files from before the fixes are in `~/.gemini/backups-2026-11-16/`.
