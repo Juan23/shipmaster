@@ -1,51 +1,21 @@
 # shipmaster
 
-Claude Code skills that take GitHub issues to merged without you watching each one.
+Claude Code skills and worker agents: Claude workers picked from a performance log, and DeepSeek attackers before the Claude reviews.
 
-- **ship** takes one issue to merged: it builds the change test-first, runs `code-review` (coding standards and the issue's spec) and fixes what it finds, opens a PR, runs review rounds with a fresh reviewer until one is clean, and merges. Each PR review runs `ponytail-review` (bugs, safety, load, missing tests, code that shouldn't be there) with the issue, plus `security-review` when the round's change touches a security path (migrations, policies, auth, edge functions, payments, secrets); round 1 also gives each acceptance criterion a verdict, met or not met, with its evidence. Notes that only touch wording, comments or names never block the merge.
-- **shipmaster** runs `ship` for a batch of issues, one at a time or several at once. As soon as a ship merges, it starts the next unblocked issue. It only coordinates; the ships do the work.
-- **opencode-worker** runs DeepSeek through opencode, only when you ask for it by name, and as the read-only attackers of `attack-round`; `ship` and `shipmaster` never call it. It tells whether a run is done, stuck, looping or never started. Its three-worker build arena was retired on 2026-11-15; comparing options before building moved to design forks in the `gremlins` skill.
+- **opencode-worker** runs DeepSeek through opencode as the read-only attackers of `attack-round`, and for a task where the owner names DeepSeek. It tells whether a run is done, stuck, looping or never started.
 - **attack-round** runs cheap read-only reviewers (three DeepSeek attackers and agy Gemini Hydrogen) on a committed branch before the Claude `pr-reviewer`, each with a 20-minute limit, and collects what they find.
-- **worker-routing** picks the Claude model and effort for builds, fixes, reviewers and merges, from a log of how each tier did on earlier tasks, and adds to that log when the worker finishes.
-
-```
-shipmaster
-├── ship #12   (optional workers)
-└── ship #13   (optional workers)
-```
-
-## Use
-
-In Claude Code, from a checkout of the repo the issues belong to:
-
-```
-/shipmaster 12 13 14                   one by one
-/shipmaster 12 13 14 15 3 concurrent   three ships at a time
-/shipmaster 12 13 use worker-routing   ships build and fix through workers
-/shipmaster set default to sonnet 5.5 high   the model and effort every ship runs on
-/ship 12                               a single issue
-```
-
-## How it works
-
-- Each ship is a background subagent of the shipmaster session, working in its own git worktree. When a ship's turn ends, its reply wakes the shipmaster, which answers it with a follow-up message. Ships use the shipmaster session's sign-in and permission mode, and they end when that session ends.
-- Blockers come from GitHub's issue dependencies, or from a `Blocked by: #n` line in the issue body. An issue that already has an open PR continues that PR on its branch. Without one, a pushed `ticket/<n>-*` branch with commits not yet on the default branch and no PR is taken as earlier work, and the ship builds on it instead of starting over.
-- With more than one ship, a **baton** lets one ship at a time merge or use a phone, emulator or Simulator, so ships never share a device or load the machine with two merge checks.
-- When a ship needs an answer from you, the question appears in the shipmaster session, and your reply goes back to that ship.
-- All state is on disk in the session scratchpad (`ships/`), and the shipmaster rebuilds it from there and from GitHub on every wake.
-- A ship that has worked for two hours with no new commit or PR activity is reported to you, and stopped only if you say so.
-- Ships run on Opus 5.5 at medium effort unless `~/.claude/shipmaster-defaults` names another model or effort (`model=<id>`, `effort=<level>`); a ship runs the current model of the family the id names. `/shipmaster set default to …` writes it. The file is per machine, and the shipmaster session's own model does not carry over to its ships.
+- **worker-routing** picks the Claude model and effort for every worker (builds, fixes, reviewers, merges, audits), from a log of how each tier did on earlier tasks, and adds to that log when the worker finishes.
 
 ## worker-routing
 
-Before dispatching a Claude subagent (a build, a fix, a reviewer or a merge), `perf.py route` picks its tier. It starts from a tier set by the task's complexity, drops to a cheaper tier the log has proven on similar tasks, and skips tiers the log shows doing badly. With an empty log it returns the starting tier. After the worker finishes, `perf.py add` records the outcome. If accepted work later needs another build or test cycle, `perf.py rework` marks it, and that tier ranks lower next time.
+Before dispatching a Claude subagent (a build, a fix, a reviewer, a merge or an audit), `perf.py route` picks its tier. It starts from a tier set by the task's complexity, drops to a cheaper tier the log has proven on similar tasks, and skips tiers the log shows doing badly. With an empty log it returns the starting tier. After the worker finishes, `perf.py add` records the outcome. If accepted work later needs another build or test cycle, `perf.py rework` marks it, and that tier ranks lower next time.
 
 ```bash
 python3 ~/.claude/skills/worker-routing/perf.py route --type coding --complexity 3
 python3 ~/.claude/skills/worker-routing/perf.py stats
 ```
 
-The tiers, cheapest first, are `sonnet-medium`, `sonnet-high`, `opus-medium`, `opus-high` and `opus-xhigh`. `haiku-medium` sits below them only for audits and research, and for cleanup, merge and simple coding below complexity 2.5. `opus-high` (Opus 5.5, high effort) also does every PR review. They are subagent definitions in `agents/`. `skills/worker-routing/SKILL.md` has the full routing rules.
+The tiers, cheapest first, are `sonnet-medium`, `sonnet-high`, `opus-medium`, `opus-high` and `opus-xhigh`. `haiku-medium` sits below them only for audits and research, and for cleanup, merge and simple coding below complexity 2.5. PR reviews run on the `pr-reviewer` and `merge-reviewer` agents, which the review gate requires. The tiers are subagent definitions in `agents/`. `skills/worker-routing/SKILL.md` has the full routing rules.
 
 The log has one JSON line per worker and per rework, and is shared by every project on the machine: `~/.claude/skills/worker-routing/agent-performance-log.jsonl`. It never goes in this repo, and `.gitignore` blocks it if it ends up here.
 
@@ -54,8 +24,6 @@ The log has one JSON line per worker and per rework, and is shared by every proj
 ```bash
 git clone https://github.com/Juan23/shipmaster ~/Projects/shipmaster
 mkdir -p ~/.claude/skills/worker-routing ~/.claude/agents
-ln -sfn ~/Projects/shipmaster/skills/ship ~/.claude/skills/ship
-ln -sfn ~/Projects/shipmaster/skills/shipmaster ~/.claude/skills/shipmaster
 ln -sfn ~/Projects/shipmaster/skills/opencode-worker ~/.claude/skills/opencode-worker
 ln -sfn ~/Projects/shipmaster/skills/attack-round ~/.claude/skills/attack-round
 ln -sf ~/Projects/shipmaster/skills/worker-routing/{SKILL.md,perf.py} ~/.claude/skills/worker-routing/
@@ -63,12 +31,9 @@ ln -sf ~/Projects/shipmaster/agents/*.md ~/.claude/agents/
 touch ~/.claude/skills/worker-routing/agent-performance-log.jsonl
 ```
 
-The links keep the installed skills on the checkout, so `git pull` updates them. When a pull adds or removes an agent file, rerun the `ln -sf ~/Projects/shipmaster/agents/*.md` line and delete links in `~/.claude/agents/` that no longer point at a file (`find ~/.claude/agents -type l ! -exec test -e {} \; -delete`). The worker-routing install links its two files instead of the folder, so the log stays in `~/.claude/skills/worker-routing/` and out of the checkout. `touch` creates an empty log on a new machine and leaves an existing one alone. Running the block again after the clone is safe: it replaces copied skill files, copied agents and old links with links to this checkout. It can't fix two leftovers, so delete them first: a `ship`, `shipmaster` or `opencode-worker` folder that is a copy rather than a link, and a `worker-routing` folder that is itself a link.
+The links keep the installed skills on the checkout, so `git pull` updates them. When a pull adds or removes an agent file, rerun the `ln -sf ~/Projects/shipmaster/agents/*.md` line and delete links in `~/.claude/agents/` that no longer point at a file (`find ~/.claude/agents -type l ! -exec test -e {} \; -delete`). On a machine that had the retired `ship` and `shipmaster` skills, delete their dead links once with `find ~/.claude/skills -maxdepth 1 -type l ! -exec test -e {} \; -delete`. The worker-routing install links its two files instead of the folder, so the log stays in `~/.claude/skills/worker-routing/` and out of the checkout. `touch` creates an empty log on a new machine and leaves an existing one alone. Running the block again after the clone is safe: it replaces copied skill files, copied agents and old links with links to this checkout. It can't fix two leftovers, so delete them first: an `opencode-worker` or `attack-round` folder that is a copy rather than a link, and a `worker-routing` folder that is itself a link.
 
 You also need:
 
-- Claude Code with the Agent and SendMessage tools;
-- `gh`, signed in, `git` and Python 3;
-- the `tdd`, `code-review` and `commentdiet` skills and the ponytail plugin (for `ponytail-review`), which `ship` calls.
-
-Run the shipmaster from a session in auto permission mode.
+- Claude Code with the Agent tool;
+- `git`, Python 3, and opencode signed in to the `opencode-go` provider.
