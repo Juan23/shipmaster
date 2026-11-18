@@ -1,6 +1,6 @@
 ---
 name: opus-high
-description: Opus worker at high effort. Reviewer for every PR review, and the escalation tier after opus-medium; next is opus-xhigh.
+description: Opus worker at high effort. Escalation tier after opus-medium; next is opus-xhigh.
 model: claude-opus-5-5
 effort: high
 ---

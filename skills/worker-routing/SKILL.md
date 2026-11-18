@@ -1,21 +1,21 @@
 ---
 name: worker-routing
-description: "Use before dispatching any Claude subagent (Agent tool: builds, fixes, reviewers, merges) and after one finishes: pick its tier from the performance log, then record the outcome. Also for questions about tier/model statistics."
+description: "Use before dispatching any worker (Agent tool: builds, fixes, check runs, reviewers, merges, audits) and after one finishes: pick its Claude tier from the performance log, then record the outcome. Also for questions about tier/model statistics."
 ---
 
 Every worker dispatch is a **routing** decision backed by the performance log, and every finished worker adds one **row** to it. Route to the cheapest tier the evidence doesn't rule out.
 
 Tool: `python3 ~/.claude/skills/worker-routing/perf.py` — `route` before a dispatch, `add` after it, `rework` when its output later needs another build or test cycle, `stats` only when the user asks for statistics. The log is shared by every project (`~/.claude/skills/worker-routing/agent-performance-log.jsonl`), append-only, and owned by the tool: one `route` call and one `add` call per worker, one `rework` call per defect found later, nothing else touches the file.
 
-## Which work comes here (owner, 2026-11-08)
+## Which work comes here (owner, 2026-11-18)
 
-Workers are Claude subagents. Route every dispatch here: builds and fixes (type `coding`, or a harness type), reviews (`review`) and merges (`merge`).
+Workers are Claude subagents, and every dispatch is routed here: builds, fixes and check runs, reviews (rule 5), merges, audits, diagnosis, device runs and design work. DeepSeek runs only as the `attack-round` attackers, or for a task where the owner names DeepSeek (the `opencode-worker` skill).
 
 ## Tiers
 
 Agent types in `~/.claude/agents/`, cheapest first (owner, 2026-11-02):
 `sonnet-medium` → `sonnet-high` → `opus-medium` → `opus-high` → `opus-xhigh`.
-`opus-high` is also the PR reviewer (rule 5).
+PR reviews use their own agents, not a tier (rule 5).
 
 Haiku is dropped except for the work the log shows it doing reliably: audits (research and read-only checks) at any complexity, and cleanup, merge and simple coding below c2.5. There `route` starts at `haiku-medium`, one step below `sonnet-medium`; everywhere else it never returns Haiku.
 
@@ -27,7 +27,7 @@ Retired, never dispatched: `haiku-high`, `opus-low` (owner, 2026-11-02) and `hai
 2. `perf.py route --type <type> --complexity <#.#>`. It starts from a complexity floor, drops to a cheaper tier the log has **proven** on similar tasks, and steps over tiers the log shows **weak**.
 3. Spawn with `subagent_type` set to the routed tier. Override it only with a reason the log can't see (for example, the task needs a device run the worker must design from scratch), and put that reason in the row's note. Give the worker an attempt cap for device runs.
 4. **Owner default at c5** (complexity ≥ 4.5, any type): spawn `sonnet-high` whatever `route` returns, and start the row's note with `owner-default c5:`. The owner set this on 2026-10-13.
-5. **Owner default for every PR review** (the final review that gates a merge and any earlier or re-review of a PR): spawn `opus-high` (Opus 5.5, high effort; `--model opus --effort high` on the row) whatever `route` returns, even at c5 (this rule overrides rule 4), type `review`, and start the row's note with `owner-default review:`. The owner set this on 2026-10-22 with `opus-medium` and raised it to `opus-high` on 2026-10-25: one fixed reviewer makes the review rows a measure of that reviewer's effectiveness, and the final review no longer comes from the Haiku tiers it judges. Review rows before 2026-10-22 mix tiers and are not evidence of it; review rows from 2026-10-22 to 2026-10-24 are opus-medium, and from 2026-10-25 they are opus-high.
+5. **Owner default for every PR review**: spawn `pr-reviewer` for a review before the PR is opened and `merge-reviewer` for a review of an open PR, whatever `route` returns, even at c5 (this rule overrides rule 4). Both run the current Opus model at high effort; record the row with `--model opus --effort high`, type `review`, and start its note with `owner-default review:`. The review gate accepts only these two agents, and one fixed reviewer makes the review rows a measure of that reviewer.
 
 ## Escalation
 
