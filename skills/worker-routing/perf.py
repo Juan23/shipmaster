@@ -6,7 +6,8 @@ One log for every project, in this user-level skill folder: ~/.claude/skills/wor
 import argparse, collections, json, os, sys
 from datetime import date
 
-MODELS = {"haiku": "haiku-5.5", "sonnet": "sonnet-5.5", "opus": "opus-5.5"}
+MODELS = {"haiku": "haiku-5.5", "sonnet": "sonnet-5.5", "opus": "opus-5.5",
+          "deepseek": "deepseek-v4.1-flash", "hydrogen": "hydrogen-gemini-4", "argon": "argon-gemini-4"}  # first word is the tier name
 EFFORTS = ["low", "medium", "high", "xhigh", "max", "unknown"]
 TYPES = ["audit", "design", "merge", "cleanup", "coding", "bug-diagnosis", "harness-build", "device-run", "harness-fix", "review"]
 LEGACY_TYPES = ["hosted-harness"]  # pre-split rows; readable in stats, not accepted by add/route
@@ -82,9 +83,9 @@ def stats(rows, a):
             print(f"  {t:34}{len(v):>3} reworks, {sum(r['cycles'] for r in v)} rebuild/retest cycles, {sum(r.get('wall_min') or 0 for r in v):.0f} min")
 
 
-LADDER = ["sonnet-medium", "sonnet-high", "opus-medium", "opus-high", "opus-xhigh"]
+LADDER = ["deepseek-high", "argon-medium", "hydrogen-medium", "sonnet-high", "opus-medium", "opus-high", "opus-xhigh"]
 HAIKU = "haiku-medium"  # below the ladder, only for the work haiku_ok allows (owner, 2026-11-02)
-RETIRED = {"haiku-high": HAIKU, "opus-low": "sonnet-high"}  # --after a worker started before 2026-11-02 steps above its equivalent
+RETIRED = {"haiku-high": HAIKU, "opus-low": "sonnet-high", "sonnet-medium": "hydrogen-medium"}  # --after a retired tier steps above its equivalent
 
 
 def haiku_ok(type_, c):
@@ -94,7 +95,7 @@ def haiku_ok(type_, c):
 
 def floor(c):
     """Cold-start index on the ladder by complexity (1.0-5.0); data moves it either way."""
-    return 0 if c < 3.5 else 1
+    return 0 if c < 3.5 else LADDER.index("sonnet-high")
 
 
 def cx(s):
@@ -212,7 +213,7 @@ def main():
     rw.add_argument("--date")
     rw.add_argument("--note", required=True)
     d = sub.add_parser("add")
-    d.add_argument("--model", required=True, help="haiku | sonnet | opus")
+    d.add_argument("--model", required=True, help=" | ".join(MODELS))
     d.add_argument("--effort", required=True, choices=EFFORTS)
     d.add_argument("--type", required=True, choices=TYPES)
     d.add_argument("--platform", choices=PLATFORMS, default="none", help="device platform the task touched (default none)")
