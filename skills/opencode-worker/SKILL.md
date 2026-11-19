@@ -59,7 +59,7 @@ Ping: `~/.claude/skills/opencode-worker/limited.sh 120 opencode run --standalone
 | Partial | Killed or crashed midway | Discard the worktree. |
 | Provider error midway | Error event or exit 1 after some events (rate limit, funds, context too long) | Retry once if temporary; report funds or access errors. |
 | Output cut short | No final `step_finish` | Failure, even with exit 0. |
-| Orphan | Wrapper died, opencode still editing | `kill $(cat oc.pid)`: `limited.sh` then kills its whole process tree. Never a broad `pkill`, since other sessions run opencode too. |
+| Orphan | Wrapper died, opencode still editing | `kill $(cat "$SCRATCH/oc.pid")`: `limited.sh` then kills its whole process tree. Never a broad `pkill`, since other sessions run opencode too. |
 | Every call hangs | Ping times out too | Report it. Never restart the shared opencode service: it runs other sessions' workers. |
 
 ## Rules
