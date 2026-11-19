@@ -22,10 +22,11 @@ PR reviews never go to DeepSeek: they run on `pr-reviewer` and `merge-reviewer` 
 ## The call
 
 ```bash
+RUN="$SCRATCH/<task-slug>"; mkdir -p "$RUN"   # SCRATCH: the session scratch folder; one RUN folder per worker
 ~/.claude/skills/opencode-worker/limited.sh 1800 opencode run --standalone --format json \
   -m "opencode-go/deepseek-v4.1-flash#high" "<task>" \
-  < /dev/null > "$SCRATCH/oc.jsonl" 2> "$SCRATCH/oc.err" &   # SCRATCH: the session scratch folder
-echo $! > "$SCRATCH/oc.pid"; wait $!
+  < /dev/null > "$RUN/oc.jsonl" 2> "$RUN/oc.err" &
+echo $! > "$RUN/oc.pid"; wait $!
 ```
 
 - `limited.sh` is a 30-minute hard limit that kills opencode's server too; `timeout` is not installed on the m1air. `test-limited.sh` tests it.
@@ -51,7 +52,7 @@ Ping: `~/.claude/skills/opencode-worker/limited.sh 120 opencode run --standalone
 | Did not start | Non-zero exit within seconds; error on stderr (bad model, not signed in, no funds, binary missing) | Setup failure. Never retry unchanged; report the error. |
 | Started, no first event | No `step_start` within 60s | Provider queue or server start is stuck. Kill it; retry once. |
 | Running and working | New events keep arriving; files change | Leave it. |
-| Alive but idle | Process exists, no new event for 10 min, low CPU | Hidden prompt, network wait or throttling. Kill it. High effort thinks quietly, so judge by CPU and missing events, not silence alone. The work runs in the client's child server, so read that one: `ps -o %cpu= -p $(pgrep -P $(pgrep -P $(cat "$SCRATCH/oc.pid")))`. |
+| Alive but idle | Process exists, no new event for 10 min, low CPU | Hidden prompt, network wait or throttling. Kill it. High effort thinks quietly, so judge by CPU and missing events, not silence alone. The work runs in the client's child server, so read that one: `ps -o %cpu= -p $(pgrep -P $(pgrep -P $(cat "$RUN/oc.pid")))`. |
 | Alive but looping | Same tool call or error 3+ times; a file edited back and forth | Kill it. Narrow the task before any retry. |
 | Busy, no progress | Many reads or thinking, no edits, no `step_finish` | Hard wall-clock limit (`limited.sh`). |
 | Says done, isn't | Exit 0, task unmet or nothing changed | Never trust its report; check the diff and tests yourself. |
@@ -59,7 +60,7 @@ Ping: `~/.claude/skills/opencode-worker/limited.sh 120 opencode run --standalone
 | Partial | Killed or crashed midway | Discard the worktree. |
 | Provider error midway | Error event or exit 1 after some events (rate limit, funds, context too long) | Retry once if temporary; report funds or access errors. |
 | Output cut short | No final `step_finish` | Failure, even with exit 0. |
-| Orphan | Wrapper died, opencode still editing | `kill $(cat "$SCRATCH/oc.pid")`: `limited.sh` then kills its whole process tree. Never a broad `pkill`, since other sessions run opencode too. |
+| Orphan | Wrapper died, opencode still editing | `kill $(cat "$RUN/oc.pid")`: `limited.sh` then kills its whole process tree. Never a broad `pkill`, since other sessions run opencode too. |
 | Every call hangs | Ping times out too | Report it. Never restart the shared opencode service: it runs other sessions' workers. |
 
 ## Rules

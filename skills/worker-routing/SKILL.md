@@ -24,11 +24,12 @@ PR reviews use their own agents, not a tier (rule 5).
 | `argon-medium` | agy, the call below with `--model gemini-4-argon-medium` | `gemini-4-argon-medium` (agy's default effort for Argon) |
 | `haiku-medium`, `sonnet-high`, `opus-*` | Agent tool, `subagent_type` = the tier | the agent file in `~/.claude/agents/` |
 
-The agy call, run from the worker's own worktree (`SCRATCH`: the session scratch folder):
+The agy call, run from the worker's own worktree (`SCRATCH`: the session scratch folder; one `RUN` folder per worker, so parallel workers keep their own output):
 
 ```bash
+RUN="$SCRATCH/<task-slug>"; mkdir -p "$RUN"
 ~/.claude/skills/opencode-worker/limited.sh 1800 agy -p "<task>" --model gemini-4-hydrogen-medium \
-  --print-timeout 1770s --output-format json < /dev/null > "$SCRATCH/agy.json" 2> "$SCRATCH/agy.err"
+  --print-timeout 1770s --output-format json < /dev/null > "$RUN/agy.json" 2> "$RUN/agy.err"
 ```
 
 - agy's default mode edits files and runs commands headless; `--mode auto` is not available on this account.
