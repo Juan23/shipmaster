@@ -44,21 +44,8 @@ trap cleanup EXIT
 mkdir -p "$WT/.opencode/agents" "$WT/.attack" && cp "$HERE/opencode-attacker.md" "$WT/.opencode/agents/attacker.md" || exit 2
 git -C "$REPO" diff "$BASE..$SHA" > "$WT/.attack/diff.patch" && git -C "$REPO" log --format='%h %s' "$BASE..$SHA" > "$WT/.attack/commits.txt" || exit 2
 
-# Runs a command in its own process group and kills the whole group at the limit, so opencode's child
-# server cannot outlive it. `timeout` is not installed on every Mac; perl is. Closed stdin: opencode hangs on an open one.
-limited() {
-  local secs="$1"; shift
-  perl -e '
-    my $secs = shift;
-    my $pid = fork() // exit 1;
-    if ($pid == 0) { setpgrp(0, 0); exec @ARGV or exit 127; }
-    $SIG{TERM} = $SIG{HUP} = sub { kill "KILL", -$pid; exit 143; };  # a stopped round must not leave the model running
-    local $SIG{ALRM} = sub { kill "KILL", -$pid; waitpid($pid, 0); exit 142; };
-    alarm $secs;
-    waitpid($pid, 0);
-    exit($? & 127 ? 128 + ($? & 127) : $? >> 8);
-  ' "$secs" "$@" < /dev/null
-}
+# Closed stdin: opencode hangs on an open one.
+limited() { "$HERE/../opencode-worker/limited.sh" "$@" < /dev/null; }
 
 common_prompt() { # bash substitution, not sed: a base such as origin/main breaks a sed pattern
   local text; text="$(cat "$HERE/prompts/common.md")"
