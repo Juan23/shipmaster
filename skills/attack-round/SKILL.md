@@ -29,7 +29,7 @@ From the branch's checkout, as a background command (it ends within about 24 min
 
 ## Triage
 
-One Claude worker (type `audit`, tier from `worker-routing`) checks each finding against the code:
+One worker (type `audit`, tier from `worker-routing`) checks each finding against the code:
 - Keep it only if its scenario holds. Drop findings without a scenario.
 - For each kept finding, the builder writes the failing test it names (`/tdd`), then the fix.
 - All fixes land as one commit. Then spawn the `pr-reviewer` as usual. Never show it the attack findings: it must not have seen the work.

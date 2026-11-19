@@ -1,6 +1,6 @@
 ---
 name: haiku-medium
-description: Haiku worker at medium reasoning effort. Only for audits and research, and cleanup, merge or simple coding below complexity 2.5; everything else starts at deepseek-high.
+description: Haiku worker at medium reasoning effort. Only for audits and research, and cleanup, merge or simple coding below complexity 2.5; everything else goes to the tier worker-routing returns.
 model: haiku
 effort: medium
 ---

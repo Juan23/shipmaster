@@ -21,7 +21,7 @@ PR reviews use their own agents, not a tier (rule 5).
 |---|---|---|
 | `deepseek-high` | opencode, the call in the `opencode-worker` skill | `opencode-go/deepseek-v4.1-flash#high` |
 | `hydrogen-medium` | agy, the call below | `gemini-4-hydrogen-medium` (agy's default effort for Hydrogen) |
-| `argon-medium` | agy, the call below | `gemini-4-argon-medium` (agy's default effort for Argon) |
+| `argon-medium` | agy, the call below with `--model gemini-4-argon-medium` | `gemini-4-argon-medium` (agy's default effort for Argon) |
 | `haiku-medium`, `sonnet-high`, `opus-*` | Agent tool, `subagent_type` = the tier | the agent file in `~/.claude/agents/` |
 
 The agy call, run from the worker's own worktree (`SCRATCH`: the session scratch folder):
@@ -32,8 +32,7 @@ The agy call, run from the worker's own worktree (`SCRATCH`: the session scratch
 ```
 
 - agy's default mode edits files and runs commands headless; `--mode auto` is not available on this account.
-- `ktok` for the row: `usage.total_tokens` in `agy.json`, in thousands.
-- Hydrogen shares its quota with Neon and Gemini 3.8 Flash (resets about every 5 hours); Argon has its own weekly pool. A quota error is an `env` blocker: `route ... --after` that tier.
+- Hydrogen shares its quota with Neon and Gemini 3.8 Flash (resets about every 5 hours); Argon has its own weekly pool.
 - Check a DeepSeek or Gemini worker's result yourself (diff, the repo's checks, scope), as the `opencode-worker` skill says.
 
 Haiku is dropped except for the work the log shows it doing reliably: audits (research and read-only checks) at any complexity, and cleanup, merge and simple coding below c2.5. There `route` starts at `haiku-medium`, one step below `deepseek-high`; everywhere else it never returns Haiku.
@@ -50,7 +49,7 @@ Retired, never dispatched: `haiku-high`, `opus-low` (owner, 2026-11-02), `haiku-
 
 ## Escalation
 
-When a worker returns `partial`/`fail` with `blocker: model`, self-declines on size, or retries blindly: record its row, then `route ... --after <its tier>` for the next one. An `env` blocker (device, host, network, staging drift) keeps the same tier: fix the environment and redispatch.
+When a worker returns `partial`/`fail` with `blocker: model`, self-declines on size, or retries blindly: record its row, then `route ... --after <its tier>` for the next one. An `env` blocker (device, host, network, staging drift) keeps the same tier: fix the environment and redispatch. A quota error or failed ping on DeepSeek or Gemini cannot be fixed now: `route ... --after` that tier.
 
 ## Recording
 
@@ -61,7 +60,7 @@ python3 ~/.claude/skills/worker-routing/perf.py add --model deepseek --effort hi
 ```
 
 - `--model`: `haiku`, `sonnet`, `opus`, `deepseek`, `hydrogen` or `argon`.
-- `ktok`: exact `subagent_tokens` from the task-notification `<usage>`, in thousands; for agy, `usage.total_tokens`; for opencode, the token totals of its `step_finish` events. Leave it out only for a killed or timed-out run that reported none.
+- `ktok`: exact `subagent_tokens` from the task-notification `<usage>`, in thousands; for agy, `usage.total_tokens` in `agy.json`; for opencode, the sum of `tokens.input`, `tokens.output` and `tokens.reasoning` over its `step_finish` events. Leave it out only for a killed or timed-out run that reported none.
 - `blocker`: `model` when the worker's reasoning or harness code failed it; `env` when the device, host, network, or staging state did; `none` otherwise.
 - `attempts`: device runs or retries used. `interventions`: orchestrator messages that redirected or unblocked it.
 - `--escalated-from`/`--escalated-to`: tier names, set on both rows of a hand-off. `--wall-min` when known.

@@ -84,7 +84,7 @@ def stats(rows, a):
 
 LADDER = ["deepseek-high", "hydrogen-medium", "argon-medium", "sonnet-high", "opus-medium", "opus-high", "opus-xhigh"]  # owner, 2026-11-19
 HAIKU = "haiku-medium"  # below the ladder, only for the work haiku_ok allows (owner, 2026-11-02)
-RETIRED = {"haiku-high": HAIKU, "opus-low": "sonnet-high", "sonnet-medium": "argon-medium"}  # --after a retired tier steps above its equivalent
+RETIRED = {"haiku-high": HAIKU, "opus-low": "sonnet-high", "sonnet-medium": "argon-medium"}
 
 
 def haiku_ok(type_, c):
