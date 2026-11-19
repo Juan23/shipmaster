@@ -27,7 +27,7 @@ PR reviews use their own agents, not a tier (rule 5).
 The agy call, run from the worker's own worktree (`SCRATCH`: the session scratch folder):
 
 ```bash
-perl -e 'alarm shift; exec @ARGV' 1800 agy -p "<task>" --model gemini-4-hydrogen-medium \
+~/.claude/skills/opencode-worker/limited.sh 1800 agy -p "<task>" --model gemini-4-hydrogen-medium \
   --print-timeout 1770s --output-format json < /dev/null > "$SCRATCH/agy.json" 2> "$SCRATCH/agy.err"
 ```
 
@@ -57,11 +57,11 @@ When a worker returns `partial`/`fail` with `blocker: model`, self-declines on s
 After **each** worker finishes, append its row before acting on the result:
 
 ```bash
-python3 ~/.claude/skills/worker-routing/perf.py add --model sonnet --effort medium --type coding --platform none --task "#88 capacity copy fix" --complexity 3 --outcome pass --blocker none --attempts 0 --interventions 0 --ktok 194 --note "one line: what happened and why"
+python3 ~/.claude/skills/worker-routing/perf.py add --model deepseek --effort high --type coding --platform none --task "#88 capacity copy fix" --complexity 3 --outcome pass --blocker none --attempts 0 --interventions 0 --ktok 194 --note "one line: what happened and why"
 ```
 
 - `--model`: `haiku`, `sonnet`, `opus`, `deepseek`, `hydrogen` or `argon`.
-- `ktok`: exact `subagent_tokens` from the task-notification `<usage>`, in thousands; for agy, `usage.total_tokens`; for opencode, the token totals of its `step_finish` events.
+- `ktok`: exact `subagent_tokens` from the task-notification `<usage>`, in thousands; for agy, `usage.total_tokens`; for opencode, the token totals of its `step_finish` events. Leave it out only for a killed or timed-out run that reported none.
 - `blocker`: `model` when the worker's reasoning or harness code failed it; `env` when the device, host, network, or staging state did; `none` otherwise.
 - `attempts`: device runs or retries used. `interventions`: orchestrator messages that redirected or unblocked it.
 - `--escalated-from`/`--escalated-to`: tier names, set on both rows of a hand-off. `--wall-min` when known.

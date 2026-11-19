@@ -222,7 +222,7 @@ def main():
     d.add_argument("--blocker", required=True, choices=BLOCKERS)
     d.add_argument("--attempts", required=True, type=int)
     d.add_argument("--interventions", required=True, type=int)
-    d.add_argument("--ktok", required=True, type=int)
+    d.add_argument("--ktok", type=int, help="leave out only when the run reported no token count (killed or timed out)")
     d.add_argument("--escalated-from")
     d.add_argument("--escalated-to")
     d.add_argument("--wall-min", type=float)

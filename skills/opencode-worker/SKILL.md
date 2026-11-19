@@ -22,13 +22,13 @@ Reviews never go to DeepSeek: they run on the Claude reviewer agents. If opencod
 ## The call
 
 ```bash
-perl -e 'alarm shift; exec @ARGV' 1800 opencode run --standalone --format json \
+~/.claude/skills/opencode-worker/limited.sh 1800 opencode run --standalone --format json \
   -m "opencode-go/deepseek-v4.1-flash#high" "<task>" \
   < /dev/null > "$SCRATCH/oc.jsonl" 2> "$SCRATCH/oc.err" &   # SCRATCH: the session scratch folder
 echo $! > "$SCRATCH/oc.pid"; wait $!
 ```
 
-- The `perl` line is a 30-minute hard limit that works on every Mac; `timeout` is not installed on the m1air.
+- `limited.sh` is a 30-minute hard limit that kills opencode's child server too; `timeout` is not installed on the m1air. `test-limited.sh` tests it.
 - Model and effort are fixed: `opencode-go/deepseek-v4.1-flash#high`. The paid `opencode/deepseek-*` models fail with "Insufficient account funds". Always pass `-m`; never rely on defaults.
 - An unknown `#variant` is rejected at once, so a typo cannot silently drop the effort.
 - Errors exit 1. Exit 0 only means the process ended, not that the task is done.
@@ -51,15 +51,15 @@ Ping: `perl -e 'alarm shift; exec @ARGV' 120 opencode run --standalone -m "openc
 | Did not start | Non-zero exit within seconds; error on stderr (bad model, not signed in, no funds, binary missing) | Setup failure. Never retry unchanged; report the error. |
 | Started, no first event | No `step_start` within 60s | Provider queue or server start is stuck. Kill it; retry once. |
 | Running and working | New events keep arriving; files change | Leave it. |
-| Alive but idle | Process exists, no new event for 10 min, low CPU | Hidden prompt, network wait or throttling. Kill it. High effort thinks quietly, so judge by CPU and missing events, not silence alone. The work runs in the client's child server, so read that one: `ps -o %cpu= -p $(pgrep -P $(cat oc.pid))`. |
+| Alive but idle | Process exists, no new event for 10 min, low CPU | Hidden prompt, network wait or throttling. Kill it. High effort thinks quietly, so judge by CPU and missing events, not silence alone. The work runs in the client's child server, so read the whole group: `ps -o pid=,%cpu= -p "$(pgrep -g $(pgrep -P $(cat oc.pid)) | paste -sd, -)"`. |
 | Alive but looping | Same tool call or error 3+ times; a file edited back and forth | Kill it. Narrow the task before any retry. |
-| Busy, no progress | Many reads or thinking, no edits, no `step_finish` | Hard wall-clock limit (the `perl` alarm). |
+| Busy, no progress | Many reads or thinking, no edits, no `step_finish` | Hard wall-clock limit (`limited.sh`). |
 | Says done, isn't | Exit 0, task unmet or nothing changed | Never trust its report; check the diff and tests yourself. |
 | Done but wrong | Changes are broken or outside scope | Run the repo's checks; reject edits outside the files given. |
 | Partial | Killed or crashed midway | Discard the worktree. |
 | Provider error midway | Error event or exit 1 after some events (rate limit, funds, context too long) | Retry once if temporary; report funds or access errors. |
 | Output cut short | No final `step_finish` | Failure, even with exit 0. |
-| Orphan | Wrapper died, opencode still editing | Kill the id in `oc.pid` only, never a broad `pkill`, since other sessions run opencode too. |
+| Orphan | Wrapper died, opencode still editing | `kill $(cat oc.pid)`: `limited.sh` then kills its whole group. Never a broad `pkill`, since other sessions run opencode too. |
 | Every call hangs | Ping times out too | Report it. Never restart the shared opencode service: it runs other sessions' workers. |
 
 ## Rules

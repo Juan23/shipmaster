@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run: python3 ~/.claude/skills/worker-routing/test_perf.py"""
+"""Run from the repo: python3 skills/worker-routing/test_perf.py"""
 import json, os, subprocess, sys, tempfile, unittest
 
 PERF = os.path.join(os.path.dirname(os.path.abspath(__file__)), "perf.py")
@@ -42,6 +42,14 @@ class Route(unittest.TestCase):
         self.add("deepseek", "high", "fail")
         self.add("deepseek", "high", "fail")
         self.assertIn("route: hydrogen-medium", self.route("--type", "coding", "--complexity", "3"))
+
+    def test_killed_run_without_token_count_is_recorded(self):
+        self.run_perf("add", "--model", "hydrogen", "--effort", "medium", "--type", "coding", "--task", "killed",
+                      "--complexity", "3", "--outcome", "fail", "--blocker", "model", "--attempts", "0",
+                      "--interventions", "0", "--note", "timed out, no usage")
+        with open(self.log) as f:
+            self.assertIsNone(json.loads(f.readline())["ktok"])
+        self.run_perf("stats")
 
     def test_add_records_gemini_model_names(self):
         self.add("argon", "medium", "pass")
