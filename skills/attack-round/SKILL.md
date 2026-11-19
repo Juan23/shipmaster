@@ -1,6 +1,6 @@
 ---
 name: attack-round
-description: Alongside the first pr-reviewer round for a code change, run cheap read-only attackers (DeepSeek focuses + agy Gemini) on the committed branch, triage their findings, and fix the real ones.
+description: Alongside each pr-reviewer round for a code change, run cheap read-only attackers (DeepSeek focuses + agy Gemini; agy alone on later changes) on the committed branch, triage their findings, and fix the real ones.
 ---
 
 # Attack round
@@ -28,7 +28,8 @@ From the branch's checkout, as a background command (it ends within about 24 min
 - agy uses Hydrogen high (owner, 2026-11-17: it took 4 minutes on a review where Argon medium took 11.5 and Argon high timed out). If Hydrogen fails fast (quota, error), it retries once on Argon medium. If headless agy refuses a command (it refuses any `*` wildcard, and one refusal ends its run), it retries once on the same model and is told which command was refused. A timeout does not retry, and a retry only gets the time left.
 - Reviewers work in a throwaway worktree, which is deleted at the end. DeepSeek runs as the `attacker` agent (`opencode-attacker.md`, copied into that worktree): it can only read and search files inside the worktree, with no shell, no edits and no web, so the script saves the diff to `.attack/diff.patch` for it. agy runs in `--mode plan` under its own command allow list.
 - Output: `findings.md` in the `--out` folder, with one status line per reviewer: `done`, `timeout`, `failed` or `skipped`.
-- Fail fast, never stop: a reviewer that is `skipped`, `failed`, `timeout` or `same model as the builder` does not hold up the work. Tell the owner one line per such reviewer in the report (the status line and its error file), so they can fix the tool, and carry on with what arrived.
+- Fail fast, never stop: a reviewer that is `skipped`, `failed` or `timeout` does not hold up the work. Tell the owner one line per such reviewer in the report (the status line and its `*.err` file in the `--out` folder), so they can fix the tool, and carry on with what arrived.
+- Tell the owner about `same model as the builder` only when no reviewer of another model answered. A DeepSeek builder's DeepSeek attackers always carry it; that is expected while agy answers.
 
 ## Triage
 

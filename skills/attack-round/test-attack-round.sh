@@ -16,6 +16,7 @@ cat > "$T/bin/opencode" <<'EOF'
 #!/bin/bash
 prompt="${@: -1}"
 if [[ "$prompt" == *"Reply with just: pong"* ]]; then
+  [ -n "${DS_PING_MARK:-}" ] && touch "$DS_PING_MARK"
   [ "${FAKE_DS:-ok}" = ping-fail ] && { echo "Insufficient account funds" >&2; exit 1; }
   echo '{"type":"text","part":{"text":"pong"}}'; echo '{"type":"step_finish","part":{"reason":"stop"}}'; exit 0
 fi
@@ -133,6 +134,7 @@ grep -q "AGY finding from gemini-4-hydrogen-high" "$F" && grep -q "agy: done (ge
 run ds-down FAKE_DS=ping-fail
 F="$T/out-ds-down/findings.md"
 grep -q "deepseek-security: skipped" "$F" && pass "failed ping skips DeepSeek" || fail "DeepSeek not skipped on failed ping"
+grep -q "Insufficient account funds" "$T/out-ds-down/ds-ping.err" && pass "a failed ping keeps its error for the owner" || fail "ping error lost"
 grep -q "AGY finding" "$F" && pass "agy still runs when DeepSeek is down" || fail "agy did not run"
 
 git branch -q base/x HEAD~1
@@ -152,7 +154,8 @@ F="$T/out-builder-hy-only/findings.md"
 grep -q "agy: done (gemini-4-hydrogen-high) - same model as the builder" "$F" && pass "with no other agy model, the builder's model reviews and the summary says so" || fail "no same-model fallback or note"
 "$SCRIPT" --base HEAD~1 --focus security --builder deepseek-high --out "$T/out-builder-ds" > "$T/builder-ds.log" 2>&1
 grep -q "deepseek-security: done - same model as the builder" "$T/builder-ds.log" && pass "a DeepSeek build flags the DeepSeek attackers as the same model" || fail "same-model DeepSeek not flagged"
-"$SCRIPT" --base HEAD~1 --focus "" --out "$T/out-agy-only" > /dev/null 2>&1
+env DS_PING_MARK="$T/ds-pinged" "$SCRIPT" --base HEAD~1 --focus "" --out "$T/out-agy-only" > /dev/null 2>&1
+[ ! -e "$T/ds-pinged" ] && pass "an agy-only round does not ping DeepSeek" || fail "agy-only round waited on a DeepSeek ping"
 F="$T/out-agy-only/findings.md"
 ! grep -q "deepseek-" "$F" && grep -q "AGY finding" "$F" && pass "an empty focus runs agy only" || fail "empty focus did not run agy alone"
 
