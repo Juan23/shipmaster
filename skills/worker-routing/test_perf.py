@@ -28,6 +28,9 @@ class Route(unittest.TestCase):
     def test_after_an_in_flight_sonnet_medium_goes_to_sonnet_high(self):
         self.assertEqual(routed([], "bug-diagnosis", 2, after="sonnet-medium"), "sonnet-high")
 
+    def test_merges_stay_on_claude(self):
+        self.assertEqual(routed([], "merge", 3), "sonnet-high")
+
     def test_hydrogen_and_argon_keep_separate_records(self):
         self.assertEqual(perf.tier(f"{perf.MODELS['hydrogen']}/medium"), "hydrogen-medium")
         self.assertEqual(perf.tier(f"{perf.MODELS['argon']}/medium"), "argon-medium")

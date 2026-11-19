@@ -1,14 +1,14 @@
 # shipmaster
 
-Claude Code skills and worker agents: Claude workers picked from a performance log, and DeepSeek attackers before the Claude reviews.
+Claude Code skills and worker agents: workers picked from a performance log, and DeepSeek attackers before the Claude reviews.
 
-- **opencode-worker** runs DeepSeek through opencode as the read-only attackers of `attack-round`, and for a task where the owner names DeepSeek. It tells whether a run is done, stuck, looping or never started.
+- **opencode-worker** runs DeepSeek through opencode as the read-only attackers of `attack-round` and as the `deepseek-high` worker tier. It tells whether a run is done, stuck, looping or never started.
 - **attack-round** runs cheap read-only reviewers (three DeepSeek attackers and agy Gemini Hydrogen) on a committed branch before the Claude `pr-reviewer`, each with a 20-minute limit, and collects what they find.
-- **worker-routing** picks the Claude model and effort for every worker (builds, fixes, reviewers, merges, audits), from a log of how each tier did on earlier tasks, and adds to that log when the worker finishes.
+- **worker-routing** picks the model and effort for every worker (builds, fixes, reviewers, merges, audits), from a log of how each tier did on earlier tasks, and adds to that log when the worker finishes.
 
 ## worker-routing
 
-Before dispatching a Claude subagent (a build, a fix, a reviewer, a merge or an audit), `perf.py route` picks its tier. It starts from a tier set by the task's complexity, drops to a cheaper tier the log has proven on similar tasks, and skips tiers the log shows doing badly. With an empty log it returns the starting tier. After the worker finishes, `perf.py add` records the outcome. If accepted work later needs another build or test cycle, `perf.py rework` marks it, and that tier ranks lower next time.
+Before dispatching a worker (a build, a fix, a reviewer, a merge or an audit), `perf.py route` picks its tier. It starts from a tier set by the task's complexity, drops to a cheaper tier the log has proven on similar tasks, and skips tiers the log shows doing badly. With an empty log it returns the starting tier. After the worker finishes, `perf.py add` records the outcome. If accepted work later needs another build or test cycle, `perf.py rework` marks it, and that tier ranks lower next time.
 
 ```bash
 python3 ~/.claude/skills/worker-routing/perf.py route --type coding --complexity 3
@@ -36,4 +36,4 @@ The links keep the installed skills on the checkout, so `git pull` updates them.
 You also need:
 
 - Claude Code with the Agent tool;
-- `git`, Python 3, and opencode signed in to the `opencode-go` provider.
+- `git`, Python 3, opencode signed in to the `opencode-go` provider, and agy (Antigravity CLI) signed in.

@@ -85,6 +85,8 @@ def stats(rows, a):
 
 LADDER = ["deepseek-high", "argon-medium", "hydrogen-medium", "sonnet-high", "opus-medium", "opus-high", "opus-xhigh"]
 HAIKU = "haiku-medium"  # below the ladder, only for the work haiku_ok allows (owner, 2026-11-02)
+SHELL = {"deepseek-high", "argon-medium", "hydrogen-medium"}  # non-Claude tiers, run from the shell
+CLAUDE_ONLY = ("merge", "review")  # owner: reviews and merges never go to DeepSeek or Gemini
 RETIRED = {"haiku-high": HAIKU, "opus-low": "sonnet-high", "sonnet-medium": "hydrogen-medium"}  # --after a retired tier steps above its equivalent
 
 
@@ -93,9 +95,9 @@ def haiku_ok(type_, c):
     return type_ == "audit" or (type_ in ("cleanup", "merge", "coding") and c < 2.5)
 
 
-def floor(c):
+def floor(c, ladder):
     """Cold-start index on the ladder by complexity (1.0-5.0); data moves it either way."""
-    return 0 if c < 3.5 else LADDER.index("sonnet-high")
+    return 0 if c < 3.5 else ladder.index("sonnet-high")
 
 
 def cx(s):
@@ -122,7 +124,7 @@ def route(rows, a):
     hardest ones, so a strong tier's failures say little about a cheaper tier with its own record.
     A reworked row loses 0.5: a pass that needed another build/test cycle scores like a partial."""
     rows, reworked = split(rows)
-    ladder = ([HAIKU] if haiku_ok(a.type, a.complexity) else []) + LADDER
+    ladder = ([HAIKU] if haiku_ok(a.type, a.complexity) else []) + [t for t in LADDER if not (a.type in CLAUDE_ONLY and t in SHELL)]
     ev = collections.defaultdict(list)
     for r in rows:
         t = f"{r['model'].split('-')[0]}-{r['effort']}"
@@ -132,7 +134,7 @@ def route(rows, a):
     score = {t: sum(val(r) for r in v) / len(v) for t, v in ev.items()}
     proven = [i for i, t in enumerate(ladder) if len(ev[t]) >= 2 and score[t] >= 0.67]
     weak = [i for i, t in enumerate(ladder) if len(ev[t]) >= 2 and score[t] < 0.5]
-    i = 0 if ladder[0] == HAIKU else floor(a.complexity)
+    i = 0 if ladder[0] == HAIKU else floor(a.complexity, ladder)
     why = [f"floor {ladder[i]} for c{a.complexity}"]
     if proven and min(proven) < i:
         i = min(proven)

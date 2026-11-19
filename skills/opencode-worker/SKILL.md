@@ -17,7 +17,7 @@ description: Run opencode (DeepSeek) headless, as the attack-round attackers or 
 | Reviewer | Claude | `/code-review` and `/commentdiet` before a PR opens; `/ponytail-review` on the PR. |
 | Merger | Claude | Merges branches and PRs. |
 
-Reviews never go to DeepSeek: they use the review agents in `worker-routing` rule 5. If opencode fails its ping or a setup check, record an `env` row and route `--after deepseek-high`.
+Reviews and merges never go to DeepSeek: reviews use the review agents in `worker-routing` rule 5, and `route` keeps merges on Claude. If opencode fails its ping or a setup check, record an `env` row and route `--after deepseek-high`.
 
 ## The call
 

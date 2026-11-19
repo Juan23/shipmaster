@@ -1,6 +1,6 @@
 ---
 name: worker-routing
-description: "Use before dispatching any worker (Agent tool: builds, fixes, check runs, reviewers, merges, audits) and after one finishes: pick its Claude tier from the performance log, then record the outcome. Also for questions about tier/model statistics."
+description: "Use before dispatching any worker (Agent tool or shell: builds, fixes, check runs, reviewers, merges, audits) and after one finishes: pick its tier from the performance log, then record the outcome. Also for questions about tier/model statistics."
 ---
 
 Every worker dispatch is a **routing** decision backed by the performance log, and every finished worker adds one **row** to it. Route to the cheapest tier the evidence doesn't rule out.
@@ -15,7 +15,7 @@ Every dispatch is routed here: builds, fixes and check runs, reviews (rule 5), m
 
 Cheapest first, then weakest first on Terminal-Bench 4.1 (owner, 2026-11-19):
 `deepseek-high` → `argon-medium` → `hydrogen-medium` → `sonnet-high` → `opus-medium` → `opus-high` → `opus-xhigh`.
-The first three run from the shell (next section); the rest are agent types in `~/.claude/agents/`.
+The first three run from the shell (next section); the rest are agent types in `~/.claude/agents/`. Merges skip the shell tiers.
 PR reviews use their own agents, not a tier (rule 5).
 
 Haiku is dropped except for the work the log shows it doing reliably: audits (research and read-only checks) at any complexity, and cleanup, merge and simple coding below c2.5. There `route` starts at `haiku-medium`, one step below `deepseek-high`; everywhere else it never returns Haiku.
@@ -43,18 +43,19 @@ Run each one in its own worktree, as a background command, one writer per set of
 - Medium is agy's own default for both Gemini models (the bare names resolve to `-medium`); the explicit name keeps the row's tier true if that default changes.
 - Wrap the agy call in `perl -e 'alarm shift; exec @ARGV' 1800` for a hard 30-minute limit. Headless agy refuses any command with a `*` wildcard, and one refusal ends its run: say so in the task.
 - Ktok: opencode's `step_finish` tokens or agy's `usage.total_tokens`, in thousands.
-- A tool that fails its ping, is out of quota or is not signed in: record the row with `blocker: env` and route `--after` that tier.
+- Ping before real work: `opencode-worker` has DeepSeek's; for agy, `agy -p "Reply with just: pong" --model <model> --print-timeout 60s` must print `pong`.
+- A tool that fails its ping, is out of quota or is not signed in: record the row with `blocker: env` and route `--after` that tier. This is the one `env` case that moves up a tier.
 
 ## Escalation
 
-When a worker returns `partial`/`fail` with `blocker: model`, self-declines on size, or retries blindly: record its row, then `route ... --after <its tier>` for the next one. An `env` blocker (device, host, network, staging drift) keeps the same tier: fix the environment and redispatch.
+When a worker returns `partial`/`fail` with `blocker: model`, self-declines on size, or retries blindly: record its row, then `route ... --after <its tier>` for the next one. An `env` blocker (device, host, network, staging drift) keeps the same tier: fix the environment and redispatch. A shell tier that is down is the exception (Non-Claude tiers).
 
 ## Recording
 
 After **each** worker finishes, append its row before acting on the result:
 
 ```bash
-python3 ~/.claude/skills/worker-routing/perf.py add --model sonnet --effort medium --type coding --platform none --task "#88 capacity copy fix" --complexity 3 --outcome pass --blocker none --attempts 0 --interventions 0 --ktok 194 --note "one line: what happened and why"
+python3 ~/.claude/skills/worker-routing/perf.py add --model deepseek --effort high --type coding --platform none --task "#88 capacity copy fix" --complexity 3 --outcome pass --blocker none --attempts 0 --interventions 0 --ktok 194 --note "one line: what happened and why"
 ```
 
 - `ktok`: exact `subagent_tokens` from the task-notification `<usage>`, in thousands.
