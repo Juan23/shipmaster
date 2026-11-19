@@ -54,7 +54,7 @@ When a worker returns `partial`/`fail` with `blocker: model`, self-declines on s
 After **each** worker finishes, append its row before acting on the result:
 
 ```bash
-python3 ~/.claude/skills/worker-routing/perf.py add --model deepseek --effort high --type coding --platform none --task "#88 capacity copy fix" --complexity 3 --outcome pass --blocker none --attempts 0 --interventions 0 --ktok 194 --note "one line: what happened and why"
+python3 ~/.claude/skills/worker-routing/perf.py add --model hydrogen --effort medium --type coding --platform none --task "#88 capacity copy fix" --complexity 3 --outcome pass --blocker none --attempts 0 --interventions 0 --ktok 194 --note "one line: what happened and why"
 ```
 
 - `ktok`: exact `subagent_tokens` from the task-notification `<usage>`, in thousands.

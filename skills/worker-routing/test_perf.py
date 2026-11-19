@@ -4,10 +4,6 @@ from types import SimpleNamespace
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import perf
 
-def row(model, effort, outcome="pass", c=2):
-    return {"model": model, "effort": effort, "type": "bug-diagnosis", "complexity": c, "outcome": outcome, "blocker": "none", "task": f"{model} {outcome}"}
-
-
 def routed(rows, type_, c, after=None):
     out = io.StringIO()
     with contextlib.redirect_stdout(out):
