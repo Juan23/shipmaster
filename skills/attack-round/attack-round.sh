@@ -1,7 +1,7 @@
 #!/bin/bash
 # Attack round: cheap read-only reviewers (DeepSeek attackers + agy Gemini) on the committed branch,
-# before the Claude pr-reviewer. Finishes within twice the ping limit plus the time limit, with whatever arrived.
-# Usage: attack-round.sh --base <ref> [--focus security,failure,timing] [--out <dir>]
+# alongside the Claude pr-reviewer. Finishes within twice the ping limit plus the time limit, with whatever arrived.
+# Usage: attack-round.sh --base <ref> [--focus security,failure,timing] [--builder <tier>] [--out <dir>]
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 OPENCODE_BIN="${OPENCODE_BIN:-opencode}"
@@ -14,16 +14,23 @@ PING_LIMIT="${PING_LIMIT:-120}"
 MIN_RETRY_SECS=120 # alarm 0 would turn the limit off, and print-timeout needs 30 s of margin
 TIMED_OUT=142 # exit status of a process killed by the perl alarm (128 + SIGALRM)
 
-BASE="" FOCUS="security,failure,timing" OUT=""
+BASE="" FOCUS="security,failure,timing" OUT="" BUILDER=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --base) BASE="$2"; shift 2;;
     --focus) FOCUS="$2"; shift 2;;
     --out) OUT="$2"; shift 2;;
+    --builder) BUILDER="$2"; shift 2;;
     *) echo "unknown option: $1" >&2; exit 2;;
   esac
 done
-[ -n "$BASE" ] || { echo "usage: attack-round.sh --base <ref> [--focus a,b] [--out dir]" >&2; exit 2; }
+[ -n "$BASE" ] || { echo "usage: attack-round.sh --base <ref> [--focus a,b] [--builder tier] [--out dir]" >&2; exit 2; }
+# A reviewer differs from the builder where it can; the builder's own model still reviews when nothing else answers.
+case "$BUILDER" in hydrogen*) PRIMARY="$BACKUP" BACKUP="gemini-4-hydrogen-high";; esac
+same_model_note() { # same_model_note <status> <text naming the model>: only a reviewer that answered counts
+  [ -n "$BUILDER" ] || return 0
+  case "$1" in done*) case "$2" in *"${BUILDER%%-*}"*) echo " - same model as the builder";; esac;; esac
+}
 
 REPO="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "not in a git repository" >&2; exit 2; }
 git -C "$REPO" diff --quiet HEAD || { echo "commit your changes first: the round reviews a commit" >&2; exit 2; }
@@ -31,8 +38,8 @@ SHA="$(git -C "$REPO" rev-parse HEAD)"
 git -C "$REPO" rev-parse --verify -q "$BASE^{commit}" >/dev/null || { echo "unknown base: $BASE" >&2; exit 2; }
 OUT="${OUT:-${TMPDIR:-/tmp}/attack-round-${SHA:0:8}}"
 mkdir -p "$OUT"
-# A reused folder must not show an earlier run's answers under this run's status lines.
-rm -f "$OUT"/ds-*.md "$OUT"/ds-*.status "$OUT"/agy.md "$OUT"/agy.status "$OUT"/agy.denied "$OUT"/agy.model
+# A reused folder must not show an earlier run's outputs under this run's status lines.
+rm -f "$OUT"/ds-*.md "$OUT"/ds-*.status "$OUT"/agy.md "$OUT"/agy.status "$OUT"/agy.denied "$OUT"/agy.model "$OUT"/*ping*.err
 WT="$OUT/wt"
 
 # Attackers may write files despite the prompt; a throwaway worktree keeps that away from the branch.
@@ -73,8 +80,14 @@ prompt_for() { # prompt_for <focus>
   cat "$HERE/prompts/$1.md"
 }
 
-ds_ping() { (cd "$WT" && limited "$PING_LIMIT" "$OPENCODE_BIN" run --standalone --format json --agent attacker -m "$DS_MODEL" "Reply with just: pong") 2>/dev/null | grep -q pong; }
-agy_ping_model() { limited "$PING_LIMIT" "$AGY_BIN" -p "Reply with just: pong" --model "$1" --print-timeout "${PING_LIMIT}s" 2>/dev/null | grep -q pong; }
+pinged() { # pinged <err file> <cmd...>: 0 on pong; a hung ping prints nothing, so its error file says so
+  local err="$1" out code; shift
+  out="$("$@" 2> "$err")"; code=$?
+  [ "$code" = "$TIMED_OUT" ] && echo "no answer within ${PING_LIMIT}s" >> "$err"
+  echo "$out" | grep -q pong
+}
+ds_ping() { (cd "$WT" && pinged "$OUT/ds-ping.err" limited "$PING_LIMIT" "$OPENCODE_BIN" run --standalone --format json --agent attacker -m "$DS_MODEL" "Reply with just: pong"); }
+agy_ping_model() { pinged "$OUT/agy-ping-$1.err" limited "$PING_LIMIT" "$AGY_BIN" -p "Reply with just: pong" --model "$1" --print-timeout "${PING_LIMIT}s"; }
 agy_ping() { # writes the first model that answers to agy.model; a primary that is down still leaves the backup
   local m
   for m in "$PRIMARY" "$BACKUP"; do agy_ping_model "$m" && { echo "$m" > "$OUT/agy.model"; return 0; }; done
@@ -142,25 +155,26 @@ run_agy() {
   else echo "failed (exit $code)" > "$OUT/agy.status"; fi
 }
 
-FOCUSES="$(echo "$FOCUS" | tr ',' ' ')"
+FOCUSES="$(echo $FOCUS | tr ',' ' ' | xargs)" # xargs trims, so "," or " " leaves no focus
 for f in $FOCUSES; do [ -f "$HERE/prompts/$f.md" ] || { echo "no prompt for focus: $f" >&2; exit 2; }; done
 
-ds_ping & DS_PING=$!
+DS_UP=0
+[ -n "$FOCUSES" ] && { ds_ping & DS_PING=$!; }
 agy_ping & AGY_PING=$!
-wait "$DS_PING" && DS_UP=1 || DS_UP=0
+[ -n "$FOCUSES" ] && { wait "$DS_PING" && DS_UP=1; }
 wait "$AGY_PING" && AGY_UP=1 || AGY_UP=0
 
 for f in $FOCUSES; do
-  if [ "$DS_UP" = 1 ]; then run_ds "$f" & else echo "skipped (ping failed)" > "$OUT/ds-$f.status"; fi
+  if [ "$DS_UP" = 1 ]; then run_ds "$f" & else echo "skipped (ping failed, see ds-ping.err)" > "$OUT/ds-$f.status"; fi
 done
-if [ "$AGY_UP" = 1 ]; then run_agy & else echo "skipped (ping failed)" > "$OUT/agy.status"; fi
+if [ "$AGY_UP" = 1 ]; then run_agy & else echo "skipped (ping failed, see agy-ping-$PRIMARY.err and agy-ping-$BACKUP.err)" > "$OUT/agy.status"; fi
 wait
 
 {
   echo "# Attack round on ${SHA:0:8} (base $BASE)"
   echo
-  for f in $FOCUSES; do echo "- deepseek-$f: $(cat "$OUT/ds-$f.status")"; done
-  echo "- agy: $(cat "$OUT/agy.status")"
+  for f in $FOCUSES; do s="$(cat "$OUT/ds-$f.status")"; echo "- deepseek-$f: $s$(same_model_note "$s" deepseek)"; done
+  s="$(cat "$OUT/agy.status")"; echo "- agy: $s$(same_model_note "$s" "$s")"
   for f in $FOCUSES; do
     [ -s "$OUT/ds-$f.md" ] && { echo; echo "## deepseek-$f"; echo; cat "$OUT/ds-$f.md"; }
   done

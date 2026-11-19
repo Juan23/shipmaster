@@ -16,6 +16,7 @@ cat > "$T/bin/opencode" <<'EOF'
 #!/bin/bash
 prompt="${@: -1}"
 if [[ "$prompt" == *"Reply with just: pong"* ]]; then
+  [ -n "${DS_PING_MARK:-}" ] && touch "$DS_PING_MARK"
   [ "${FAKE_DS:-ok}" = ping-fail ] && { echo "Insufficient account funds" >&2; exit 1; }
   echo '{"type":"text","part":{"text":"pong"}}'; echo '{"type":"step_finish","part":{"reason":"stop"}}'; exit 0
 fi
@@ -28,7 +29,7 @@ range=$(echo "$prompt" | grep -o 'commit in [^ ]*\.\.HEAD' | head -n 1)
 printf '{"type":"text","part":{"text":"DS finding for %s (%s)\\nScenario: two lines\\n- bullet inside finding\\nATTACK DONE"}}\n' "$focus" "$range"
 echo '{"type":"step_finish","part":{"reason":"stop"}}'
 EOF
-# Fake agy (stream-json): FAKE_PRIMARY = ok | quota | quota-run | down | hang | print-timeout | denied | denied-once. The backup model always answers.
+# Fake agy (stream-json): FAKE_PRIMARY = ok | quota | quota-run | down | hang | print-timeout | denied | denied-once. The backup model answers unless FAKE_BACKUP=quota fails its ping.
 cat > "$T/bin/agy" <<'EOF'
 #!/bin/bash
 model=""; prompt=""
@@ -38,6 +39,7 @@ done
 if [[ "$prompt" == *"Reply with just: pong"* ]]; then
   [ "$model" = gemini-4-hydrogen-high ] && [ "${FAKE_PRIMARY:-ok}" = quota ] && { echo 'AGY_ERROR: {"status":"RESOURCE_EXHAUSTED"}' >&2; exit 1; }
   [ "$model" = gemini-4-hydrogen-high ] && [ "${FAKE_PRIMARY:-ok}" = down ] && sleep 30
+  [ "$model" = gemini-4-argon-medium ] && [ "${FAKE_BACKUP:-ok}" = quota ] && { echo 'AGY_ERROR: {"status":"RESOURCE_EXHAUSTED"}' >&2; exit 1; }
   echo pong; exit 0
 fi
 if [ "$model" = gemini-4-hydrogen-high ]; then
@@ -100,10 +102,12 @@ F="$T/out-primary-quota/findings.md"
 grep -q "AGY finding from gemini-4-argon-medium" "$F" && pass "a primary failure falls back to the backup model" || fail "no backup fallback"
 run primary-no-quota FAKE_PRIMARY=quota
 grep -q "agy: done (gemini-4-argon-medium)" "$T/out-primary-no-quota/findings.md" && pass "a primary out of quota at the ping goes straight to the backup" || fail "primary out of quota skipped agy"
+grep -q "RESOURCE_EXHAUSTED" "$T/out-primary-no-quota/agy-ping-gemini-4-hydrogen-high.err" && pass "a failed agy ping keeps its error for the owner" || fail "agy ping error lost"
 
 start=$(date +%s)
 run primary-down FAKE_PRIMARY=down PING_LIMIT=2 ATTACK_LIMIT=20
 took=$(( $(date +%s) - start ))
+grep -q "no answer within 2s" "$T/out-primary-down/agy-ping-gemini-4-hydrogen-high.err" && pass "a hung ping says so in its error file" || fail "hung ping left an empty error file"
 grep -q "agy: done (gemini-4-argon-medium)" "$T/out-primary-down/findings.md" && [ "$took" -lt 15 ] && pass "a primary that hangs on its ping is skipped for the backup (${took}s)" || fail "hung primary still started (${took}s)"
 
 run primary-hang FAKE_PRIMARY=hang ATTACK_LIMIT=3
@@ -132,6 +136,7 @@ grep -q "AGY finding from gemini-4-hydrogen-high" "$F" && grep -q "agy: done (ge
 run ds-down FAKE_DS=ping-fail
 F="$T/out-ds-down/findings.md"
 grep -q "deepseek-security: skipped" "$F" && pass "failed ping skips DeepSeek" || fail "DeepSeek not skipped on failed ping"
+grep -q "Insufficient account funds" "$T/out-ds-down/ds-ping.err" && pass "a failed ping keeps its error for the owner" || fail "ping error lost"
 grep -q "AGY finding" "$F" && pass "agy still runs when DeepSeek is down" || fail "agy did not run"
 
 git branch -q base/x HEAD~1
@@ -142,6 +147,21 @@ grep -q "commit in base/x..HEAD" "$T/out-slash/findings.md" && pass "a base with
 env FAKE_DS=ping-fail FAKE_PRIMARY=hang ATTACK_LIMIT=3 "$SCRIPT" --base HEAD~1 --focus security --out "$T/out-reuse" > /dev/null 2>&1
 F="$T/out-reuse/findings.md"
 ! grep -q "DS finding\|AGY finding" "$F" && pass "a reused output folder shows no earlier answers" || fail "earlier answers leaked into a reused folder"
+
+"$SCRIPT" --base HEAD~1 --focus security --builder hydrogen-medium --out "$T/out-builder-hy" > /dev/null 2>&1
+F="$T/out-builder-hy/findings.md"
+grep -q "agy: done (gemini-4-argon-medium)$" "$F" && pass "a Hydrogen build is reviewed by a different agy model" || fail "agy reviewed with the builder's model"
+env FAKE_BACKUP=quota "$SCRIPT" --base HEAD~1 --focus security --builder hydrogen-medium --out "$T/out-builder-hy-only" > /dev/null 2>&1
+F="$T/out-builder-hy-only/findings.md"
+grep -q "agy: done (gemini-4-hydrogen-high) - same model as the builder" "$F" && pass "with no other agy model, the builder's model reviews and the summary says so" || fail "no same-model fallback or note"
+"$SCRIPT" --base HEAD~1 --focus security --builder deepseek-high --out "$T/out-builder-ds" > "$T/builder-ds.log" 2>&1
+grep -q "deepseek-security: done - same model as the builder" "$T/builder-ds.log" && pass "a DeepSeek build flags the DeepSeek attackers as the same model" || fail "same-model DeepSeek not flagged"
+env DS_PING_MARK="$T/ds-pinged" "$SCRIPT" --base HEAD~1 --focus "" --out "$T/out-agy-only" > /dev/null 2>&1
+[ ! -e "$T/ds-pinged" ] && pass "an agy-only round does not ping DeepSeek" || fail "agy-only round waited on a DeepSeek ping"
+env DS_PING_MARK="$T/ds-pinged-comma" "$SCRIPT" --base HEAD~1 --focus "," --out "$T/out-comma" > /dev/null 2>&1
+[ ! -e "$T/ds-pinged-comma" ] && pass "a focus list with no names does not ping DeepSeek" || fail "a blank focus list pinged DeepSeek"
+F="$T/out-agy-only/findings.md"
+! grep -q "deepseek-" "$F" && grep -q "AGY finding" "$F" && pass "an empty focus runs agy only" || fail "empty focus did not run agy alone"
 
 echo c >> f.txt
 run dirty

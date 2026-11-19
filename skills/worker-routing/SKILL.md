@@ -68,7 +68,7 @@ Done when `add` reports the appended row.
 
 **Rework** is a defect in a worker's accepted output, found later (review, screenshot check, device run), that forces another build or test cycle — a slight visual inconsistency counts. The owner's scarce resource is wall-clock time, and rework spends it, so `route` scores a reworked row 0.5 lower: a reworked pass ranks like a partial. A fix that needs no rebuild or retest (copy, comment) is not rework.
 
-When you find rework, charge it to the worker whose row produced it, before dispatching the fix:
+Every real finding from the attack round, a pr-reviewer or a merge-reviewer that needs a code fix is rework: this is how the log judges each builder tier, so a weak default worker drops out of `route` by itself. When you find rework, charge it to the worker whose row produced it, before dispatching the fix:
 
 ```bash
 python3 ~/.claude/skills/worker-routing/perf.py rework --task "#88 capacity copy fix" --cycles 1 --wall-min 25 --note "one line: the defect and how it surfaced"
