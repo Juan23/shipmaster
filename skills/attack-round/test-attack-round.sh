@@ -102,10 +102,12 @@ F="$T/out-primary-quota/findings.md"
 grep -q "AGY finding from gemini-4-argon-medium" "$F" && pass "a primary failure falls back to the backup model" || fail "no backup fallback"
 run primary-no-quota FAKE_PRIMARY=quota
 grep -q "agy: done (gemini-4-argon-medium)" "$T/out-primary-no-quota/findings.md" && pass "a primary out of quota at the ping goes straight to the backup" || fail "primary out of quota skipped agy"
+grep -q "RESOURCE_EXHAUSTED" "$T/out-primary-no-quota/agy-ping-gemini-4-hydrogen-high.err" && pass "a failed agy ping keeps its error for the owner" || fail "agy ping error lost"
 
 start=$(date +%s)
 run primary-down FAKE_PRIMARY=down PING_LIMIT=2 ATTACK_LIMIT=20
 took=$(( $(date +%s) - start ))
+grep -q "no answer within 2s" "$T/out-primary-down/agy-ping-gemini-4-hydrogen-high.err" && pass "a hung ping says so in its error file" || fail "hung ping left an empty error file"
 grep -q "agy: done (gemini-4-argon-medium)" "$T/out-primary-down/findings.md" && [ "$took" -lt 15 ] && pass "a primary that hangs on its ping is skipped for the backup (${took}s)" || fail "hung primary still started (${took}s)"
 
 run primary-hang FAKE_PRIMARY=hang ATTACK_LIMIT=3
@@ -156,6 +158,8 @@ grep -q "agy: done (gemini-4-hydrogen-high) - same model as the builder" "$F" &&
 grep -q "deepseek-security: done - same model as the builder" "$T/builder-ds.log" && pass "a DeepSeek build flags the DeepSeek attackers as the same model" || fail "same-model DeepSeek not flagged"
 env DS_PING_MARK="$T/ds-pinged" "$SCRIPT" --base HEAD~1 --focus "" --out "$T/out-agy-only" > /dev/null 2>&1
 [ ! -e "$T/ds-pinged" ] && pass "an agy-only round does not ping DeepSeek" || fail "agy-only round waited on a DeepSeek ping"
+env DS_PING_MARK="$T/ds-pinged-comma" "$SCRIPT" --base HEAD~1 --focus "," --out "$T/out-comma" > /dev/null 2>&1
+[ ! -e "$T/ds-pinged-comma" ] && pass "a focus list with no names does not ping DeepSeek" || fail "a blank focus list pinged DeepSeek"
 F="$T/out-agy-only/findings.md"
 ! grep -q "deepseek-" "$F" && grep -q "AGY finding" "$F" && pass "an empty focus runs agy only" || fail "empty focus did not run agy alone"
 

@@ -27,7 +27,7 @@ done
 [ -n "$BASE" ] || { echo "usage: attack-round.sh --base <ref> [--focus a,b] [--builder tier] [--out dir]" >&2; exit 2; }
 # A reviewer differs from the builder where it can; the builder's own model still reviews when nothing else answers.
 case "$BUILDER" in hydrogen*) PRIMARY="$BACKUP" BACKUP="gemini-4-hydrogen-high";; esac
-same_model_note() { # same_model_note <status> <model>: only a reviewer that answered counts
+same_model_note() { # same_model_note <status> <text naming the model>: only a reviewer that answered counts
   [ -n "$BUILDER" ] || return 0
   case "$1" in done*) case "$2" in *"${BUILDER%%-*}"*) echo " - same model as the builder";; esac;; esac
 }
@@ -38,7 +38,7 @@ SHA="$(git -C "$REPO" rev-parse HEAD)"
 git -C "$REPO" rev-parse --verify -q "$BASE^{commit}" >/dev/null || { echo "unknown base: $BASE" >&2; exit 2; }
 OUT="${OUT:-${TMPDIR:-/tmp}/attack-round-${SHA:0:8}}"
 mkdir -p "$OUT"
-# A reused folder must not show an earlier run's answers under this run's status lines.
+# A reused folder must not show an earlier run's outputs under this run's status lines.
 rm -f "$OUT"/ds-*.md "$OUT"/ds-*.status "$OUT"/agy.md "$OUT"/agy.status "$OUT"/agy.denied "$OUT"/agy.model "$OUT"/*ping*.err
 WT="$OUT/wt"
 
@@ -80,8 +80,14 @@ prompt_for() { # prompt_for <focus>
   cat "$HERE/prompts/$1.md"
 }
 
-ds_ping() { (cd "$WT" && limited "$PING_LIMIT" "$OPENCODE_BIN" run --standalone --format json --agent attacker -m "$DS_MODEL" "Reply with just: pong") 2> "$OUT/ds-ping.err" | grep -q pong; }
-agy_ping_model() { limited "$PING_LIMIT" "$AGY_BIN" -p "Reply with just: pong" --model "$1" --print-timeout "${PING_LIMIT}s" 2> "$OUT/agy-ping-$1.err" | grep -q pong; }
+pinged() { # pinged <err file> <cmd...>: 0 on pong; a hung ping prints nothing, so its error file says so
+  local err="$1" out code; shift
+  out="$("$@" 2> "$err")"; code=$?
+  [ "$code" = "$TIMED_OUT" ] && echo "no answer within ${PING_LIMIT}s" >> "$err"
+  echo "$out" | grep -q pong
+}
+ds_ping() { (cd "$WT" && pinged "$OUT/ds-ping.err" limited "$PING_LIMIT" "$OPENCODE_BIN" run --standalone --format json --agent attacker -m "$DS_MODEL" "Reply with just: pong"); }
+agy_ping_model() { pinged "$OUT/agy-ping-$1.err" limited "$PING_LIMIT" "$AGY_BIN" -p "Reply with just: pong" --model "$1" --print-timeout "${PING_LIMIT}s"; }
 agy_ping() { # writes the first model that answers to agy.model; a primary that is down still leaves the backup
   local m
   for m in "$PRIMARY" "$BACKUP"; do agy_ping_model "$m" && { echo "$m" > "$OUT/agy.model"; return 0; }; done
@@ -149,7 +155,7 @@ run_agy() {
   else echo "failed (exit $code)" > "$OUT/agy.status"; fi
 }
 
-FOCUSES="$(echo "$FOCUS" | tr ',' ' ')"
+FOCUSES="$(echo $FOCUS | tr ',' ' ' | xargs)" # xargs trims, so "," or " " leaves no focus
 for f in $FOCUSES; do [ -f "$HERE/prompts/$f.md" ] || { echo "no prompt for focus: $f" >&2; exit 2; }; done
 
 DS_UP=0
@@ -161,7 +167,7 @@ wait "$AGY_PING" && AGY_UP=1 || AGY_UP=0
 for f in $FOCUSES; do
   if [ "$DS_UP" = 1 ]; then run_ds "$f" & else echo "skipped (ping failed, see ds-ping.err)" > "$OUT/ds-$f.status"; fi
 done
-if [ "$AGY_UP" = 1 ]; then run_agy & else echo "skipped (ping failed, see agy-ping-*.err)" > "$OUT/agy.status"; fi
+if [ "$AGY_UP" = 1 ]; then run_agy & else echo "skipped (ping failed, see agy-ping-$PRIMARY.err and agy-ping-$BACKUP.err)" > "$OUT/agy.status"; fi
 wait
 
 {
