@@ -144,7 +144,9 @@ def route(rows, a):
         i += 1
     if a.after:
         after = RETIRED.get(tier(a.after), tier(a.after))
-        i = min(max(i, ladder.index(after) + 1 if after in ladder else 0), len(ladder) - 1)
+        full = [HAIKU] + LADDER  # after may be a shell tier missing from a Claude-only ladder
+        above = [j for j, t in enumerate(ladder) if after in full and full.index(t) > full.index(after)]
+        i = max(i, above[0] if above else len(ladder) - 1) if after in full else i
         why.append(f"after {tier(a.after)} stalled")
     print(f"route: {ladder[i]} ({'; '.join(why)})")
     for t in ladder:

@@ -31,6 +31,10 @@ class Route(unittest.TestCase):
     def test_merges_stay_on_claude(self):
         self.assertEqual(routed([], "merge", 3), "sonnet-high")
 
+    def test_after_a_shell_tier_a_low_merge_never_drops_below_it(self):
+        self.assertEqual(routed([], "merge", 2, after="sonnet-medium"), "sonnet-high")
+        self.assertEqual(routed([], "merge", 2, after="deepseek-high"), "sonnet-high")
+
     def test_hydrogen_and_argon_keep_separate_records(self):
         self.assertEqual(perf.tier(f"{perf.MODELS['hydrogen']}/medium"), "hydrogen-medium")
         self.assertEqual(perf.tier(f"{perf.MODELS['argon']}/medium"), "argon-medium")

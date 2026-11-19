@@ -5,7 +5,7 @@ description: Run opencode (DeepSeek) headless, as the attack-round attackers or 
 
 # opencode worker
 
-## Roles (owner, 2026-11-18)
+## Roles (owner, 2026-11-19)
 
 `worker-routing` picks every worker. DeepSeek runs as the `attack-round` attackers and as the `deepseek-high` tier; one worker per task.
 

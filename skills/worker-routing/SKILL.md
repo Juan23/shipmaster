@@ -18,9 +18,9 @@ Cheapest first, then weakest first on Terminal-Bench 4.1 (owner, 2026-11-19):
 The first three run from the shell (next section); the rest are agent types in `~/.claude/agents/`. Merges skip the shell tiers.
 PR reviews use their own agents, not a tier (rule 5).
 
-Haiku is dropped except for the work the log shows it doing reliably: audits (research and read-only checks) at any complexity, and cleanup, merge and simple coding below c2.5. There `route` starts at `haiku-medium`, one step below `deepseek-high`; everywhere else it never returns Haiku.
+Haiku is dropped except for the work the log shows it doing reliably: audits (research and read-only checks) at any complexity, and cleanup, merge and simple coding below c2.5. There `route` starts at `haiku-medium`, one step below the ladder's lowest tier; everywhere else it never returns Haiku.
 
-Retired, never dispatched: `haiku-high`, `opus-low` (owner, 2026-11-02) and `haiku-xhigh` (2026-10-22). `sonnet-medium` (owner, 2026-11-19; `--after sonnet-medium` goes to `sonnet-high`). Old rows stay in `stats`.
+Retired, never dispatched: `haiku-high`, `opus-low` (owner, 2026-11-02), `haiku-xhigh` (2026-10-22) and `sonnet-medium` (2026-11-19; `--after sonnet-medium` goes to `sonnet-high`). Old rows stay in `stats`.
 
 ## Dispatch
 
