@@ -1,23 +1,23 @@
 ---
 name: opencode-worker
-description: Run opencode (DeepSeek) headless, only as the attack-round attackers or for a task where the owner names DeepSeek, and tell whether a run is done, stuck, looping, idle or never started. Load before any `opencode run` call that does real work.
+description: Run opencode (DeepSeek) headless, as the attack-round attackers or as the worker-routing `deepseek-high` tier, and tell whether a run is done, stuck, looping, idle or never started. Load before any `opencode run` call that does real work.
 ---
 
 # opencode worker
 
-## Roles (owner, 2026-11-18)
+## Roles (owner, 2026-11-19)
 
-Workers are Claude subagents that `worker-routing` picks. DeepSeek runs only as the `attack-round` attackers, or for a task where the owner names DeepSeek; then one worker per task.
+`worker-routing` picks every worker. DeepSeek runs as the `attack-round` attackers, and as a worker when `worker-routing` returns `deepseek-high`; then one worker per task.
 
 | Role | Who | Does |
 |---|---|---|
 | Orchestrator | Claude (this session) | Splits the work, briefs the worker, watches it, checks its result. |
 | Attacker | DeepSeek via opencode | Reads a committed branch and reports findings, run by `attack-round.sh`. |
-| Worker, only when the owner names DeepSeek | DeepSeek via opencode | Writes the code and runs the checks it is given. |
+| Worker, when `worker-routing` returns `deepseek-high` | DeepSeek via opencode | Writes the code and runs the checks it is given. |
 | Reviewer | Claude | `/code-review` and `/commentdiet` before a PR opens; `/ponytail-review` on the PR. |
-| Merger | Claude | Merges branches and PRs. |
+| Merger | The tier `worker-routing` returns | Merges branches and PRs. |
 
-Reviews and merges never go to DeepSeek: dispatch them as Claude subagents through the `worker-routing` skill. If opencode fails its ping or a setup check, report the error and fall back to the Claude worker tier `worker-routing` picks.
+Reviews never go to DeepSeek: they run on the Claude reviewer agents. If opencode fails its ping or a setup check, record an `env` row and dispatch the tier `worker-routing` returns with `--after deepseek-high`.
 
 ## The call
 
