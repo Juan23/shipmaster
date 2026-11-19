@@ -7,7 +7,7 @@ import argparse, collections, json, os, sys
 from datetime import date
 
 MODELS = {"haiku": "haiku-5.5", "sonnet": "sonnet-5.5", "opus": "opus-5.5",
-          "deepseek": "deepseek-v4.1-flash", "hydrogen": "hydrogen-gemini-4", "argon": "argon-gemini-4"}  # first word is the tier name
+          "deepseek": "deepseek-v4.1-flash", "hydrogen": "hydrogen-gemini-4"}  # first word is the tier name
 EFFORTS = ["low", "medium", "high", "xhigh", "max", "unknown"]
 TYPES = ["audit", "design", "merge", "cleanup", "coding", "bug-diagnosis", "harness-build", "device-run", "harness-fix", "review"]
 LEGACY_TYPES = ["hosted-harness"]  # pre-split rows; readable in stats, not accepted by add/route
@@ -83,21 +83,22 @@ def stats(rows, a):
             print(f"  {t:34}{len(v):>3} reworks, {sum(r['cycles'] for r in v)} rebuild/retest cycles, {sum(r.get('wall_min') or 0 for r in v):.0f} min")
 
 
-LADDER = ["deepseek-high", "argon-medium", "hydrogen-medium", "sonnet-high", "opus-medium", "opus-high", "opus-xhigh"]
-HAIKU = "haiku-medium"  # below the ladder, only for the work haiku_ok allows (owner, 2026-11-02)
-SHELL = {"deepseek-high", "argon-medium", "hydrogen-medium"}  # non-Claude tiers, run from the shell
+LADDER = ["hydrogen-medium", "sonnet-high", "opus-medium", "opus-high", "opus-xhigh"]
+DEEPSEEK, HAIKU = "deepseek-high", "haiku-medium"  # below the ladder, only for the work haiku_ok allows (owner, 2026-11-19)
+BELOW = [DEEPSEEK, HAIKU]
+SHELL = {DEEPSEEK, "hydrogen-medium"}  # non-Claude tiers, run from the shell
 CLAUDE_ONLY = ("merge", "review")  # owner: reviews and merges never go to DeepSeek or Gemini
 RETIRED = {"haiku-high": HAIKU, "opus-low": "sonnet-high", "sonnet-medium": "hydrogen-medium"}  # --after a retired tier steps above its equivalent
 
 
 def haiku_ok(type_, c):
-    """Work the log shows Haiku doing reliably: audits at any complexity; cleanup, merge and coding below c2.5."""
+    """Work the log shows Haiku doing reliably, now DeepSeek first: audits at any complexity; cleanup, merge and coding below c2.5."""
     return type_ == "audit" or (type_ in ("cleanup", "merge", "coding") and c < 2.5)
 
 
 def floor(c, ladder):
     """Cold-start index on the ladder by complexity (1.0-5.0); data moves it either way."""
-    return 0 if c < 3.5 else ladder.index("sonnet-high")
+    return 0 if c < 4.5 else ladder.index("sonnet-high")
 
 
 def cx(s):
@@ -124,7 +125,7 @@ def route(rows, a):
     hardest ones, so a strong tier's failures say little about a cheaper tier with its own record.
     A reworked row loses 0.5: a pass that needed another build/test cycle scores like a partial."""
     rows, reworked = split(rows)
-    ladder = ([HAIKU] if haiku_ok(a.type, a.complexity) else []) + [t for t in LADDER if not (a.type in CLAUDE_ONLY and t in SHELL)]
+    ladder = [t for t in (BELOW if haiku_ok(a.type, a.complexity) else []) + LADDER if not (a.type in CLAUDE_ONLY and t in SHELL)]
     ev = collections.defaultdict(list)
     for r in rows:
         t = f"{r['model'].split('-')[0]}-{r['effort']}"
@@ -134,7 +135,7 @@ def route(rows, a):
     score = {t: sum(val(r) for r in v) / len(v) for t, v in ev.items()}
     proven = [i for i, t in enumerate(ladder) if len(ev[t]) >= 2 and score[t] >= 0.67]
     weak = [i for i, t in enumerate(ladder) if len(ev[t]) >= 2 and score[t] < 0.5]
-    i = 0 if ladder[0] == HAIKU else floor(a.complexity, ladder)
+    i = 0 if ladder[0] in BELOW else floor(a.complexity, ladder)
     why = [f"floor {ladder[i]} for c{a.complexity}"]
     if proven and min(proven) < i:
         i = min(proven)
@@ -144,7 +145,7 @@ def route(rows, a):
         i += 1
     if a.after:
         after = RETIRED.get(tier(a.after), tier(a.after))
-        rank = ([HAIKU] + LADDER).index  # after may be a tier missing from this ladder (shell or Haiku)
+        rank = (BELOW + LADDER).index  # after may be a tier missing from this ladder (shell or below-ladder)
         i = max(i, next((j for j, t in enumerate(ladder) if rank(t) > rank(after)), len(ladder) - 1))
         why.append(f"after {tier(a.after)} stalled")
     print(f"route: {ladder[i]} ({'; '.join(why)})")
@@ -208,7 +209,7 @@ def main():
     ro = sub.add_parser("route")
     ro.add_argument("--type", required=True, choices=TYPES)
     ro.add_argument("--complexity", required=True, type=cx)
-    ro.add_argument("--after", choices=[HAIKU] + LADDER + list(RETIRED), help="tier that just stalled on this task; route goes above it")
+    ro.add_argument("--after", choices=BELOW + LADDER + list(RETIRED), help="tier that just stalled on this task; route goes above it")
     rw = sub.add_parser("rework", help="a defect found in a worker's accepted output forced another build/test cycle")
     rw.add_argument("--task", required=True, help="exact --task of the worker row that produced the defect")
     rw.add_argument("--cycles", required=True, type=int, help="extra build/test cycles the defect caused (>= 1)")

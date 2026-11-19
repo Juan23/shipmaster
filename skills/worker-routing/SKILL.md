@@ -9,16 +9,16 @@ Tool: `python3 ~/.claude/skills/worker-routing/perf.py` — `route` before a dis
 
 ## Which work comes here (owner, 2026-11-19)
 
-Every dispatch is routed here: builds, fixes and check runs, reviews (rule 5), merges, audits, diagnosis, device runs and design work. The cheapest tiers are DeepSeek and Gemini, run from the shell; the rest are Claude subagents (owner, 2026-11-19).
+Every dispatch is routed here: builds, fixes and check runs, reviews (rule 5), merges, audits, diagnosis, device runs and design work. Gemini and DeepSeek go first wherever they can, to save Claude usage; they run from the shell, the rest are Claude subagents (owner, 2026-11-19).
 
 ## Tiers
 
-Cheapest first, then weakest first on Terminal-Bench 4.1 (owner, 2026-11-19):
-`deepseek-high` → `argon-medium` → `hydrogen-medium` → `sonnet-high` → `opus-medium` → `opus-high` → `opus-xhigh`.
-The first three run from the shell (next section); the rest are agent types in `~/.claude/agents/`. Merges skip the shell tiers.
+Cheapest first (owner, 2026-11-19):
+`hydrogen-medium` → `sonnet-high` → `opus-medium` → `opus-high` → `opus-xhigh`.
+`hydrogen-medium` is the default worker below c4.5 and runs from the shell (next section); the rest are agent types in `~/.claude/agents/`. Merges skip the shell tiers.
 PR reviews use their own agents, not a tier (rule 5).
 
-Haiku is dropped except for the work the log shows it doing reliably: audits (research and read-only checks) at any complexity, and cleanup, merge and simple coding below c2.5. There `route` starts at `haiku-medium`, one step below the ladder's lowest tier; everywhere else it never returns Haiku.
+Below the ladder, for the work the log shows Haiku doing reliably (audits at any complexity; cleanup, merge and simple coding below c2.5): `deepseek-high` first, then `haiku-medium` if DeepSeek fails (owner, 2026-11-19). Merges skip DeepSeek and start at `haiku-medium`. Everywhere else `route` returns neither.
 
 Retired, never dispatched: `haiku-high`, `opus-low` (owner, 2026-11-02), `haiku-xhigh` (2026-10-22) and `sonnet-medium` (2026-11-19; `--after sonnet-medium` goes to `sonnet-high`). Old rows stay in `stats`.
 
@@ -37,14 +37,13 @@ Run each one in its own worktree, as a background command, one writer per set of
 | Tier | Command |
 |---|---|
 | `deepseek-high` | The call in the `opencode-worker` skill (`opencode-go/deepseek-v4.1-flash#high`). |
-| `argon-medium` | `agy -p "<task>" --model gemini-4-argon-medium --mode accept-edits --print-timeout 1770s --output-format json < /dev/null` |
-| `hydrogen-medium` | The same with `--model gemini-4-hydrogen-medium`. |
+| `hydrogen-medium` | `agy -p "<task>" --model gemini-4-hydrogen-medium --mode accept-edits --print-timeout 1770s --output-format json < /dev/null` |
 
-- Medium is agy's own default for both Gemini models (the bare names resolve to `-medium`); the explicit name keeps the row's tier true if that default changes.
+- Medium is agy's own default for Hydrogen (the bare name resolves to `-medium`); the explicit name keeps the row's tier true if that default changes.
 - Wrap the agy call in `perl -e 'alarm shift; exec @ARGV' 1800` for a hard 30-minute limit. Headless agy refuses any command with a `*` wildcard, and one refusal ends its run: say so in the task.
 - Ktok: opencode's `step_finish` tokens or agy's `usage.total_tokens`, in thousands.
-- Ping before real work: `opencode-worker` has DeepSeek's; for agy, `agy -p "Reply with just: pong" --model <model> --print-timeout 60s` must print `pong`.
-- A tool that fails its ping, is out of quota or is not signed in: record the row with `blocker: env` and route `--after` that tier. This is the one `env` case that moves up a tier.
+- Fail fast: ping before real work. `opencode-worker` has DeepSeek's; for agy, `agy -p "Reply with just: pong" --model gemini-4-hydrogen-medium --print-timeout 60s` must print `pong`.
+- A tool that fails its ping, is out of quota or is not signed in: record the row with `blocker: env` and route `--after` that tier (Hydrogen goes to `sonnet-high`, DeepSeek to `haiku-medium`). This is the one `env` case that moves up a tier.
 
 ## Escalation
 
