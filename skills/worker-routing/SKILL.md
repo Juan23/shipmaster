@@ -49,7 +49,7 @@ Retired, never dispatched: `haiku-high`, `opus-low` (owner, 2026-11-02), `haiku-
 
 ## Escalation
 
-When a worker returns `partial`/`fail` with `blocker: model`, self-declines on size, or retries blindly: record its row, then `route ... --after <its tier>` for the next one. An `env` blocker (device, host, network, staging drift) keeps the same tier: fix the environment and redispatch. A quota error or failed ping on DeepSeek or Gemini cannot be fixed now: `route ... --after` that tier.
+When a worker returns `partial`/`fail` with `blocker: model`, self-declines on size, or retries blindly: record its row, then `route ... --after <its tier>` for the next one. An `env` blocker (device, host, network, staging drift) keeps the same tier: fix the environment and redispatch. A quota error, or an opencode or agy run that fails to start, cannot be fixed now: `route ... --after` that tier.
 
 ## Recording
 
@@ -60,7 +60,7 @@ python3 ~/.claude/skills/worker-routing/perf.py add --model deepseek --effort hi
 ```
 
 - `--model`: `haiku`, `sonnet`, `opus`, `deepseek`, `hydrogen` or `argon`.
-- `ktok`: exact `subagent_tokens` from the task-notification `<usage>`, in thousands; for agy, `usage.total_tokens` in `agy.json`; for opencode, the sum of `tokens.input`, `tokens.output` and `tokens.reasoning` over its `step_finish` events. Leave it out only for a killed or timed-out run that reported none.
+- `ktok`: exact `subagent_tokens` from the task-notification `<usage>`, in thousands; for agy, `usage.total_tokens` in `agy.json`; for opencode, the sum of `part.tokens.input`, `.output` and `.reasoning` over its `step_finish` events. Leave it out only for a killed or timed-out run that reported none.
 - `blocker`: `model` when the worker's reasoning or harness code failed it; `env` when the device, host, network, or staging state did; `none` otherwise.
 - `attempts`: device runs or retries used. `interventions`: orchestrator messages that redirected or unblocked it.
 - `--escalated-from`/`--escalated-to`: tier names, set on both rows of a hand-off. `--wall-min` when known.

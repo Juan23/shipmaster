@@ -1,8 +1,13 @@
 #!/bin/bash
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"; T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT; fails=0
-# The child moves to its own process group, as opencode's server does.
-printf '#!/bin/bash\nperl -e '"'"'setpgrp(0,0); while (1) { open my $f, ">>", $ARGV[0]; print $f "x\\n"; close $f; select undef, undef, undef, 0.2 }'"'"' "$1" &\nwait\n' > "$T/leaves-child.sh"; chmod +x "$T/leaves-child.sh"
+# The child moves to its own process group, as opencode's server does, and ends when its file is gone.
+cat > "$T/leaves-child.sh" <<'EOF'
+#!/bin/bash
+perl -e 'setpgrp(0, 0); while (1) { open my $f, ">>", $ARGV[0] or exit; print $f "x\n"; close $f; select undef, undef, undef, 0.2 }' "$1" &
+wait
+EOF
+chmod +x "$T/leaves-child.sh"
 stopped() { local a b; sleep 1; a=$(wc -l < "$1"); sleep 1; b=$(wc -l < "$1"); [ "$a" = "$b" ]; }
 check() { if "${@:2}"; then echo "ok: $1"; else echo "FAIL: $1"; fails=1; fi; }
 
