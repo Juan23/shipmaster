@@ -28,7 +28,7 @@ range=$(echo "$prompt" | grep -o 'commit in [^ ]*\.\.HEAD' | head -n 1)
 printf '{"type":"text","part":{"text":"DS finding for %s (%s)\\nScenario: two lines\\n- bullet inside finding\\nATTACK DONE"}}\n' "$focus" "$range"
 echo '{"type":"step_finish","part":{"reason":"stop"}}'
 EOF
-# Fake agy (stream-json): FAKE_PRIMARY = ok | quota | quota-run | down | hang | print-timeout | denied | denied-once. The backup model always answers.
+# Fake agy (stream-json): FAKE_PRIMARY = ok | quota | quota-run | down | hang | print-timeout | denied | denied-once. The backup model answers unless FAKE_BACKUP=quota fails its ping.
 cat > "$T/bin/agy" <<'EOF'
 #!/bin/bash
 model=""; prompt=""
@@ -38,6 +38,7 @@ done
 if [[ "$prompt" == *"Reply with just: pong"* ]]; then
   [ "$model" = gemini-4-hydrogen-high ] && [ "${FAKE_PRIMARY:-ok}" = quota ] && { echo 'AGY_ERROR: {"status":"RESOURCE_EXHAUSTED"}' >&2; exit 1; }
   [ "$model" = gemini-4-hydrogen-high ] && [ "${FAKE_PRIMARY:-ok}" = down ] && sleep 30
+  [ "$model" = gemini-4-argon-medium ] && [ "${FAKE_BACKUP:-ok}" = quota ] && { echo 'AGY_ERROR: {"status":"RESOURCE_EXHAUSTED"}' >&2; exit 1; }
   echo pong; exit 0
 fi
 if [ "$model" = gemini-4-hydrogen-high ]; then
@@ -142,6 +143,18 @@ grep -q "commit in base/x..HEAD" "$T/out-slash/findings.md" && pass "a base with
 env FAKE_DS=ping-fail FAKE_PRIMARY=hang ATTACK_LIMIT=3 "$SCRIPT" --base HEAD~1 --focus security --out "$T/out-reuse" > /dev/null 2>&1
 F="$T/out-reuse/findings.md"
 ! grep -q "DS finding\|AGY finding" "$F" && pass "a reused output folder shows no earlier answers" || fail "earlier answers leaked into a reused folder"
+
+"$SCRIPT" --base HEAD~1 --focus security --builder hydrogen-medium --out "$T/out-builder-hy" > /dev/null 2>&1
+F="$T/out-builder-hy/findings.md"
+grep -q "agy: done (gemini-4-argon-medium)$" "$F" && pass "a Hydrogen build is reviewed by a different agy model" || fail "agy reviewed with the builder's model"
+env FAKE_BACKUP=quota "$SCRIPT" --base HEAD~1 --focus security --builder hydrogen-medium --out "$T/out-builder-hy-only" > /dev/null 2>&1
+F="$T/out-builder-hy-only/findings.md"
+grep -q "agy: done (gemini-4-hydrogen-high) - same model as the builder" "$F" && pass "with no other agy model, the builder's model reviews and the summary says so" || fail "no same-model fallback or note"
+"$SCRIPT" --base HEAD~1 --focus security --builder deepseek-high --out "$T/out-builder-ds" > "$T/builder-ds.log" 2>&1
+grep -q "deepseek-security: done - same model as the builder" "$T/builder-ds.log" && pass "a DeepSeek build flags the DeepSeek attackers as the same model" || fail "same-model DeepSeek not flagged"
+"$SCRIPT" --base HEAD~1 --focus "" --out "$T/out-agy-only" > /dev/null 2>&1
+F="$T/out-agy-only/findings.md"
+! grep -q "deepseek-" "$F" && grep -q "AGY finding" "$F" && pass "an empty focus runs agy only" || fail "empty focus did not run agy alone"
 
 echo c >> f.txt
 run dirty

@@ -1,9 +1,9 @@
 # shipmaster
 
-Claude Code skills and worker agents: workers picked from a performance log, and DeepSeek attackers before the Claude reviews.
+Claude Code skills and worker agents: workers picked from a performance log, and DeepSeek and Gemini attackers alongside the Claude reviews.
 
 - **opencode-worker** runs DeepSeek through opencode as the read-only attackers of `attack-round` and as the `deepseek-high` worker tier. It tells whether a run is done, stuck, looping or never started.
-- **attack-round** runs cheap read-only reviewers (three DeepSeek attackers and agy Gemini Hydrogen) on a committed branch before the Claude `pr-reviewer`, each with a 20-minute limit, and collects what they find.
+- **attack-round** runs cheap read-only reviewers (DeepSeek attackers and agy Gemini) on a committed branch at the same time as the Claude `pr-reviewer`, each with a 20-minute limit, picks a model other than the builder's where it can, and collects what they find.
 - **worker-routing** picks the model and effort for every worker (builds, fixes, reviewers, merges, audits), from a log of how each tier did on earlier tasks, and adds to that log when the worker finishes.
 
 ## worker-routing
