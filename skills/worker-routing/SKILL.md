@@ -24,6 +24,7 @@ Owner, 2026-11-21, from a three-model roundtable. `route` builds the ladder for 
 
 - A mistake in cycle work costs a slow test cycle and one more review round, so that work starts on Opus. Work that local tests can prove starts on agy.
 - The agy tiers are `hydrogen-high` and `neon-medium`, on trial against each other: `route` gives each task to the one with fewer rows of that type at that complexity. A run that the environment stopped does not count as a turn. Neon's rows from before the trial count, so Hydrogen takes the first tasks until it has as many as Neon; old `hydrogen-medium` rows do not count. The trial is 20 tasks each; `stats` shows the count, and the owner reads it and decides. `route` never sends work to a tier the log shows weak for it: a weak agy tier gets no more tasks near that complexity, in the trial or as the second try.
+- A proposal for the owner's decision, not a rule, and `route` does not apply it: the roundtable of 2026-11-21 proposed that an agy tier passes the trial when at most 4 of its 20 tasks needed rework or stopped on agy's five-hour limit, and its pull requests needed no more review rounds than a Claude builder's. A tier that fails would do attacks and audits only. Check again at 40 tasks.
 - `sonnet-high` and DeepSeek do not build. DeepSeek is an attacker only (`attack-round`).
 - The agy tiers run from the shell (next section); the rest are agent types in `~/.claude/agents/`.
 - PR reviews use their own agents, not a tier (rule 5).
