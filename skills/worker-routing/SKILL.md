@@ -58,10 +58,9 @@ Run each one in its own worktree, as a background command, one writer per set of
 
 ## Escalation
 
-When a worker returns `partial`/`fail` with `blocker: model`, self-declines on size, retries blindly, stalls (no progress, or it hits its time limit), or needs a second correction from you: record its row, then `route ... --after <its tier>` for the next one. An `env` blocker (device, host, network, staging drift) keeps the same tier: fix the environment and redispatch. A shell tier that is down is the exception (Non-Claude tiers).
+When a worker returns `partial`/`fail` with `blocker: model`, self-declines on size, retries blindly, stalls (no progress, or it hits its time limit), or needs a second correction from you: record its row, then `route ... --after <every tier that stalled on this task>` for the next one. An `env` blocker (device, host, network, staging drift) keeps the same tier: fix the environment and redispatch. A shell tier that is down is the exception (Non-Claude tiers).
 
-- `--after` takes every tier that stalled on the task, for example `--after hydrogen-high neon-medium`.
-- After a failed agy task, `--after <that tier>` gives the other agy tier one try, unless the log shows that tier weak for such work.
+- Name every stalled tier each time: `route` cannot see the earlier attempts. After Hydrogen fails, `--after hydrogen-high` gives Neon its one try, unless the log shows Neon weak for such work. After Neon fails too, `--after hydrogen-high neon-medium` goes on to Haiku or Opus.
 - Cycle work moves from `opus-medium` to `opus-high` after one failed cycle.
 
 ## Recording
