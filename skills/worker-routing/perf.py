@@ -63,12 +63,11 @@ def stats(rows, a):
             print(f"  {str(k):34}{len(v):>4}{c['pass']:>6}{c['partial']:>6}{c['fail']:>6}{100 * c['pass'] / len(v):>6.0f}%{avg:>7.0f}{per:>10}{100 * rw / len(v):>5.0f}%")
         print()
 
-    t = lambda r: f"{r['model'].split('-')[0]}-{r['effort']}"
-    table("By tier (non-env):", t, clean)
-    table("By type x tier (non-env):", lambda r: f"{r['type']} / {t(r)}", clean)
-    table("By platform x tier (non-env, rows with a platform):", lambda r: f"{r['platform']} / {t(r)}", [r for r in clean if r.get("platform") not in (None, "none")])
-    table("By complexity x tier (non-env):", lambda r: f"c{bucket(r)} / {t(r)}", clean)
-    esc = collections.Counter((r["escalated_from"] or "-", t(r)) for r in rows if r.get("escalated_from"))
+    table("By tier (non-env):", row_tier, clean)
+    table("By type x tier (non-env):", lambda r: f"{r['type']} / {row_tier(r)}", clean)
+    table("By platform x tier (non-env, rows with a platform):", lambda r: f"{r['platform']} / {row_tier(r)}", [r for r in clean if r.get("platform") not in (None, "none")])
+    table("By complexity x tier (non-env):", lambda r: f"c{bucket(r)} / {row_tier(r)}", clean)
+    esc = collections.Counter((r["escalated_from"] or "-", row_tier(r)) for r in rows if r.get("escalated_from"))
     if esc:
         print("Escalations (from -> to):")
         for (f, to), n in esc.most_common():
@@ -83,22 +82,37 @@ def stats(rows, a):
             print(f"  {t:34}{len(v):>3} reworks, {sum(r['cycles'] for r in v)} rebuild/retest cycles, {sum(r.get('wall_min') or 0 for r in v):.0f} min")
 
 
-LADDER = ["hydrogen-high", "sonnet-high", "opus-medium", "opus-high", "opus-xhigh"]
-DEEPSEEK, HAIKU = "deepseek-high", "haiku-medium"  # below the ladder, only for the work haiku_ok allows (owner, 2026-11-19)
-BELOW = [DEEPSEEK, HAIKU]
-SHELL = {DEEPSEEK, "hydrogen-high"}  # non-Claude tiers, run from the shell
-CLAUDE_ONLY = ("merge", "review")  # owner: reviews and merges never go to DeepSeek or Gemini
-RETIRED = {"haiku-high": HAIKU, "opus-low": "sonnet-high", "sonnet-medium": "hydrogen-high", "hydrogen-medium": "hydrogen-high", "neon-medium": "hydrogen-high"}  # --after a retired tier steps above its equivalent
+AGY = ["hydrogen-high", "neon-medium"]  # the trial pair (owner, 2026-11-21): route puts the one with fewer rows first
+OPUS = ["opus-medium", "opus-high", "opus-xhigh"]
+DEEPSEEK, HAIKU = "deepseek-high", "haiku-medium"
+TIERS = [DEEPSEEK] + AGY + [HAIKU, "sonnet-high"] + OPUS  # cheapest first; places an --after tier that is not on the task's ladder
+CLAUDE_ONLY = ("merge", "review")  # owner: reviews and merges never go to Gemini
+HARNESS = ("harness-build", "harness-fix")
+HARD_COMPLEXITY = 4.5
+RETIRED = {"haiku-high": HAIKU, "opus-low": "sonnet-high", "haiku-xhigh": HAIKU, "sonnet-medium": HAIKU, "hydrogen-medium": "hydrogen-high"}  # --after a retired tier steps above its equivalent
 
 
 def haiku_ok(type_, c):
-    """Work the log shows Haiku doing reliably, now DeepSeek first: audits at any complexity; cleanup, merge and coding below c2.5."""
+    """Work the log shows Haiku doing reliably: audits at any complexity; cleanup, merge and coding below c2.5."""
     return type_ == "audit" or (type_ in ("cleanup", "merge", "coding") and c < 2.5)
 
 
-def floor(c, ladder):
-    """Cold-start index on the ladder by complexity (1.0-5.0); data moves it either way."""
-    return 0 if c < 4.5 else ladder.index("sonnet-high")
+def row_tier(r):
+    return f"{r['model'].split('-')[0]}-{r['effort']}"
+
+
+def ladder_for(rows, a, tried):
+    """The tiers for a task, cheapest first, without the agy tiers it already tried: Opus where a mistake costs a test cycle, agy where local tests prove the work."""
+    t, c = a.type, a.complexity
+    if t in HARNESS or (t == "coding" and (a.cycle or c >= HARD_COMPLEXITY)):
+        return OPUS
+    same = lambda r, x: r["type"] == t and r.get("blocker") != "env" and bucket(r) == bucket({"complexity": c}) and row_tier(r) == x
+    agy = [x for x in sorted(AGY, key=lambda x: sum(same(r, x) for r in rows)) if x not in tried]  # a failed run's own row re-sorts the pair, so a tried tier leaves by name
+    haiku = [HAIKU] if haiku_ok(t, c) else []
+    if t in ("coding", "cleanup", "audit"):
+        return agy + haiku + OPUS
+    hydrogen = [] if "hydrogen-high" in tried or t in CLAUDE_ONLY else ["hydrogen-high"]  # Neon is on trial for building and audits only
+    return haiku + hydrogen + ["sonnet-high"] + OPUS
 
 
 def cx(s):
@@ -125,30 +139,38 @@ def route(rows, a):
     hardest ones, so a strong tier's failures say little about a cheaper tier with its own record.
     A reworked row loses 0.5: a pass that needed another build/test cycle scores like a partial."""
     rows, reworked = split(rows)
-    ladder = [t for t in (BELOW if haiku_ok(a.type, a.complexity) else []) + LADDER if not (a.type in CLAUDE_ONLY and t in SHELL)]
+    stalled = [tier(x) for x in a.after or []]
+    tried = [RETIRED.get(x, x) for x in stalled]
+    ladder = ladder_for(rows, a, tried)
     ev = collections.defaultdict(list)
     for r in rows:
-        t = f"{r['model'].split('-')[0]}-{r['effort']}"
+        t = row_tier(r)
         if r["type"] == a.type and r.get("blocker") != "env" and t in ladder and abs((r.get("complexity") or 0) - a.complexity) <= 1.0:
             ev[t].append(r)
     val = lambda r: max({"pass": 1, "partial": 0.5}.get(r["outcome"], 0) - 0.5 * (r["task"] in reworked), 0)
     score = {t: sum(val(r) for r in v) / len(v) for t, v in ev.items()}
     proven = [i for i, t in enumerate(ladder) if len(ev[t]) >= 2 and score[t] >= 0.67]
     weak = [i for i, t in enumerate(ladder) if len(ev[t]) >= 2 and score[t] < 0.5]
-    i = 0 if ladder[0] in BELOW else floor(a.complexity, ladder)
+    i = ladder.index("sonnet-high") if a.complexity >= HARD_COMPLEXITY and "sonnet-high" in ladder else 0
     why = [f"floor {ladder[i]} for c{a.complexity}"]
     if proven and min(proven) < i:
         i = min(proven)
         why.append(f"lowered: {ladder[i]} proven")
+    for after in tried:
+        if after in AGY:
+            continue
+        if after in ladder:
+            j = ladder.index(after) + 1
+        else:
+            j = next((k for k, t in enumerate(ladder) if TIERS.index(t) > TIERS.index(after)), len(ladder))
+        i = max(i, min(j, len(ladder) - 1))
+    if stalled:
+        why.append(f"after {', '.join(stalled)} stalled")
     while i in weak and i < len(ladder) - 1:
         why.append(f"skipped {ladder[i]}: weak")
         i += 1
-    if a.after:
-        after = RETIRED.get(tier(a.after), tier(a.after))
-        rank = (BELOW + LADDER).index  # after may be a tier missing from this ladder (shell or below-ladder)
-        i = max(i, next((j for j, t in enumerate(ladder) if rank(t) > rank(after)), len(ladder) - 1))
-        why.append(f"after {tier(a.after)} stalled")
     print(f"route: {ladder[i]} ({'; '.join(why)})")
+    print("  ladder: " + " > ".join(ladder))
     for t in ladder:
         if ev[t]:
             c = collections.Counter(r["outcome"] for r in ev[t])
@@ -209,7 +231,8 @@ def main():
     ro = sub.add_parser("route")
     ro.add_argument("--type", required=True, choices=TYPES)
     ro.add_argument("--complexity", required=True, type=cx)
-    ro.add_argument("--after", choices=BELOW + LADDER + list(RETIRED), help="tier that just stalled on this task; route goes above it")
+    ro.add_argument("--cycle", action="store_true", help="the task ends in a staging or device run")
+    ro.add_argument("--after", nargs="+", choices=TIERS + list(RETIRED), help="each tier that stalled on this task; route goes past them")
     rw = sub.add_parser("rework", help="a defect found in a worker's accepted output forced another build/test cycle")
     rw.add_argument("--task", required=True, help="exact --task of the worker row that produced the defect")
     rw.add_argument("--cycles", required=True, type=int, help="extra build/test cycles the defect caused (>= 1)")

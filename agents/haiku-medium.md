@@ -1,6 +1,6 @@
 ---
 name: haiku-medium
-description: Haiku worker at medium reasoning effort. Fallback after deepseek-high for audits and research, and cleanup, merge or simple coding below complexity 2.5; everything else goes through worker-routing.
+description: Haiku worker at medium reasoning effort. Fallback after the agy tiers for audits and research, and cleanup or simple coding below complexity 2.5; first tier for merges below 2.5; everything else goes through worker-routing.
 model: haiku
 effort: medium
 ---

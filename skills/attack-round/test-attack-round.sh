@@ -154,6 +154,8 @@ grep -q "agy: done (gemini-4-argon-medium)$" "$F" && pass "a Hydrogen build is r
 env FAKE_BACKUP=quota "$SCRIPT" --base HEAD~1 --focus security --builder hydrogen-medium --out "$T/out-builder-hy-only" > /dev/null 2>&1
 F="$T/out-builder-hy-only/findings.md"
 grep -q "agy: done (gemini-4-hydrogen-high) - same model as the builder" "$F" && pass "with no other agy model, the builder's model reviews and the summary says so" || fail "no same-model fallback or note"
+"$SCRIPT" --base HEAD~1 --focus security --builder neon-medium --out "$T/out-builder-neon" > /dev/null 2>&1
+grep -q "agy: done (gemini-4-argon-medium)$" "$T/out-builder-neon/findings.md" && pass "a Neon build is reviewed by Argon first" || fail "agy did not start a Neon build's review on Argon"
 "$SCRIPT" --base HEAD~1 --focus security --builder deepseek-high --out "$T/out-builder-ds" > "$T/builder-ds.log" 2>&1
 grep -q "deepseek-security: done - same model as the builder" "$T/builder-ds.log" && pass "a DeepSeek build flags the DeepSeek attackers as the same model" || fail "same-model DeepSeek not flagged"
 env DS_PING_MARK="$T/ds-pinged" "$SCRIPT" --base HEAD~1 --focus "" --out "$T/out-agy-only" > /dev/null 2>&1

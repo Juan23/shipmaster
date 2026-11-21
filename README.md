@@ -2,7 +2,7 @@
 
 Claude Code skills and worker agents: workers picked from a performance log, and DeepSeek and Gemini attackers alongside the Claude pr-reviewer.
 
-- **opencode-worker** runs DeepSeek through opencode as the read-only attackers of `attack-round` and as the `deepseek-high` worker tier. It tells whether a run is done, stuck, looping or never started.
+- **opencode-worker** runs DeepSeek through opencode as the read-only attackers of `attack-round`. It tells whether a run is done, stuck, looping or never started.
 - **attack-round** runs cheap read-only reviewers (DeepSeek attackers and agy Gemini) on a committed branch at the same time as the Claude `pr-reviewer`, each with a 20-minute limit, picks a model other than the builder's where it can, and collects what they find.
 - **worker-routing** picks the model and effort for every worker (builds, fixes, reviewers, merges, audits), from a log of how each tier did on earlier tasks, and adds to that log when the worker finishes.
 
@@ -15,7 +15,7 @@ python3 ~/.claude/skills/worker-routing/perf.py route --type coding --complexity
 python3 ~/.claude/skills/worker-routing/perf.py stats
 ```
 
-The tiers, cheapest first, are `hydrogen-high` (Gemini, run from the shell, the default worker), then `sonnet-high`, `opus-medium`, `opus-high` and `opus-xhigh`. Audits and research, and cleanup, merge and simple coding below complexity 2.5, start below them on `deepseek-high` and fall back to `haiku-medium`; merges skip DeepSeek. PR reviews run on the `pr-reviewer` and `merge-reviewer` agents, which the review gate requires. The Claude tiers are subagent definitions in `agents/`. `skills/worker-routing/SKILL.md` has the full routing rules.
+Work that local tests can prove starts on agy (Gemini, run from the shell): `hydrogen-high` and `neon-medium`, on trial against each other. Coding that ends in a staging or device run, harness work, and coding at complexity 4.5 and above start on `opus-medium`, then `opus-high` and `opus-xhigh`. Simple work falls back to `haiku-medium`. `sonnet-high` takes bug diagnosis, design, device runs and merges; it does not build, and DeepSeek does not build. PR reviews run on the `pr-reviewer` and `merge-reviewer` agents, which the review gate requires. The Claude tiers are subagent definitions in `agents/`. `skills/worker-routing/SKILL.md` has the full routing rules.
 
 The log has one JSON line per worker and per rework, and is shared by every project on the machine: `~/.claude/skills/worker-routing/agent-performance-log.jsonl`. It never goes in this repo, and `.gitignore` blocks it if it ends up here.
 

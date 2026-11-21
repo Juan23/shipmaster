@@ -1,23 +1,22 @@
 ---
 name: opencode-worker
-description: Run opencode (DeepSeek) headless, as the attack-round attackers or the deepseek-high worker tier, and tell whether a run is done, stuck, looping, idle or never started. Load before any `opencode run` call that does real work.
+description: Run opencode (DeepSeek) headless, as the attack-round attackers, and tell whether a run is done, stuck, looping, idle or never started. Load before any `opencode run` call that does real work.
 ---
 
 # opencode worker
 
 ## Roles (owner, 2026-11-19)
 
-`worker-routing` picks every worker. DeepSeek runs as the `attack-round` attackers and as the `deepseek-high` tier; one worker per task.
+`worker-routing` picks every worker. DeepSeek runs as the `attack-round` attackers only; it does not build (owner, 2026-11-21).
 
 | Role | Who | Does |
 |---|---|---|
 | Orchestrator | Claude (this session) | Splits the work, briefs the worker, watches it, checks its result. |
 | Attacker | DeepSeek via opencode | Reads a committed branch and reports findings, run by `attack-round.sh`. |
-| Worker, when `worker-routing` routes to `deepseek-high` | DeepSeek via opencode | Writes the code and runs the checks it is given. |
 | Reviewer | Claude | `/code-review` and `/commentdiet` before a PR opens; `/ponytail-review` on the PR. |
 | Merger | Claude | Merges branches and PRs. |
 
-Reviews and merges never go to DeepSeek: reviews use the review agents in `worker-routing` rule 5, and `route` keeps merges on Claude. If opencode fails its ping or a setup check, record an `env` row and route `--after deepseek-high`.
+Reviews and merges never go to DeepSeek: reviews use the review agents in `worker-routing` rule 5, and `route` keeps merges on Claude.
 
 ## The call
 
