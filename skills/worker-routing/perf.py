@@ -88,7 +88,7 @@ DEEPSEEK, HAIKU = "deepseek-high", "haiku-medium"
 TIERS = [DEEPSEEK] + AGY + [HAIKU, "sonnet-high"] + OPUS  # cheapest first; places an --after tier that is not on the task's ladder
 CLAUDE_ONLY = ("merge", "review")  # owner: reviews and merges never go to Gemini
 HARNESS = ("harness-build", "harness-fix")
-HARD = 4.5
+HARD_COMPLEXITY = 4.5
 RETIRED = {"haiku-high": HAIKU, "opus-low": "sonnet-high", "haiku-xhigh": HAIKU, "sonnet-medium": HAIKU, "hydrogen-medium": "hydrogen-high"}  # --after a retired tier steps above its equivalent
 
 
@@ -104,14 +104,14 @@ def row_tier(r):
 def ladder_for(rows, a, tried):
     """The tiers for a task, cheapest first, without the agy tiers it already tried: Opus where a mistake costs a test cycle, agy where local tests prove the work."""
     t, c = a.type, a.complexity
-    if t in HARNESS or (t == "coding" and (a.cycle or c >= HARD)):
+    if t in HARNESS or (t == "coding" and (a.cycle or c >= HARD_COMPLEXITY)):
         return OPUS
     same = lambda r, x: r["type"] == t and r.get("blocker") != "env" and bucket(r) == bucket({"complexity": c}) and row_tier(r) == x
     agy = [x for x in sorted(AGY, key=lambda x: sum(same(r, x) for r in rows)) if x not in tried]  # a failed run's own row re-sorts the pair, so a tried tier leaves by name
     haiku = [HAIKU] if haiku_ok(t, c) else []
     if t in ("coding", "cleanup", "audit"):
         return agy + haiku + OPUS
-    hydrogen = [x for x in AGY[:1] if x not in tried and t not in CLAUDE_ONLY]  # Neon is on trial for building and audits only
+    hydrogen = [] if "hydrogen-high" in tried or t in CLAUDE_ONLY else ["hydrogen-high"]  # Neon is on trial for building and audits only
     return haiku + hydrogen + ["sonnet-high"] + OPUS
 
 
@@ -151,14 +151,11 @@ def route(rows, a):
     score = {t: sum(val(r) for r in v) / len(v) for t, v in ev.items()}
     proven = [i for i, t in enumerate(ladder) if len(ev[t]) >= 2 and score[t] >= 0.67]
     weak = [i for i, t in enumerate(ladder) if len(ev[t]) >= 2 and score[t] < 0.5]
-    i = ladder.index("sonnet-high") if a.complexity >= HARD and "sonnet-high" in ladder else 0
+    i = ladder.index("sonnet-high") if a.complexity >= HARD_COMPLEXITY and "sonnet-high" in ladder else 0
     why = [f"floor {ladder[i]} for c{a.complexity}"]
     if proven and min(proven) < i:
         i = min(proven)
         why.append(f"lowered: {ladder[i]} proven")
-    while i in weak and i < len(ladder) - 1:
-        why.append(f"skipped {ladder[i]}: weak")
-        i += 1
     for after in tried:
         if after in AGY:
             continue
@@ -169,6 +166,9 @@ def route(rows, a):
         i = max(i, min(j, len(ladder) - 1))
     if stalled:
         why.append(f"after {', '.join(stalled)} stalled")
+    while i in weak and i < len(ladder) - 1:
+        why.append(f"skipped {ladder[i]}: weak")
+        i += 1
     print(f"route: {ladder[i]} ({'; '.join(why)})")
     print("  ladder: " + " > ".join(ladder))
     for t in ladder:

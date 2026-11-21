@@ -75,6 +75,10 @@ class Route(unittest.TestCase):
         self.assertEqual(routed(hydrogen_ran, "bug-diagnosis", 2), "hydrogen-high")
         self.assertEqual(routed(hydrogen_ran, "device-run", 3, after="hydrogen-high"), "sonnet-high")
 
+    def test_an_escalation_steps_over_a_weak_tier_too(self):
+        weak_opus = [dict(row("opus", "medium", "coding", 2), outcome="fail")] * 2
+        self.assertEqual(routed(weak_opus, "coding", 2, after="haiku-medium"), "opus-high")
+
     def test_merges_stay_on_claude(self):
         self.assertEqual(routed([], "merge", 2), "haiku-medium")
         self.assertEqual(routed([], "merge", 3), "sonnet-high")

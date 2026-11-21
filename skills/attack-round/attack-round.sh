@@ -25,7 +25,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -n "$BASE" ] || { echo "usage: attack-round.sh --base <ref> [--focus a,b] [--builder tier] [--out dir]" >&2; exit 2; }
-# A reviewer differs from the builder where it can, and Argon has its own quota. The builder's own model still reviews when nothing else answers.
+# A reviewer differs from the builder where it can, and Argon has its own quota. Hydrogen still reviews a Hydrogen build when nothing else answers.
 case "$BUILDER" in hydrogen*|neon*) PRIMARY="$BACKUP" BACKUP="gemini-4-hydrogen-high";; esac
 same_model_note() { # same_model_note <status> <text naming the model>: only a reviewer that answered counts
   [ -n "$BUILDER" ] || return 0
