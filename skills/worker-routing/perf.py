@@ -83,12 +83,12 @@ def stats(rows, a):
             print(f"  {t:34}{len(v):>3} reworks, {sum(r['cycles'] for r in v)} rebuild/retest cycles, {sum(r.get('wall_min') or 0 for r in v):.0f} min")
 
 
-LADDER = ["neon-medium", "sonnet-high", "opus-medium", "opus-high", "opus-xhigh"]
+LADDER = ["hydrogen-high", "sonnet-high", "opus-medium", "opus-high", "opus-xhigh"]
 DEEPSEEK, HAIKU = "deepseek-high", "haiku-medium"  # below the ladder, only for the work haiku_ok allows (owner, 2026-11-19)
 BELOW = [DEEPSEEK, HAIKU]
-SHELL = {DEEPSEEK, "neon-medium"}  # non-Claude tiers, run from the shell
+SHELL = {DEEPSEEK, "hydrogen-high"}  # non-Claude tiers, run from the shell
 CLAUDE_ONLY = ("merge", "review")  # owner: reviews and merges never go to DeepSeek or Gemini
-RETIRED = {"haiku-high": HAIKU, "opus-low": "sonnet-high", "sonnet-medium": "neon-medium", "hydrogen-medium": "neon-medium"}  # --after a retired tier steps above its equivalent
+RETIRED = {"haiku-high": HAIKU, "opus-low": "sonnet-high", "sonnet-medium": "hydrogen-high", "hydrogen-medium": "hydrogen-high", "neon-medium": "hydrogen-high"}  # --after a retired tier steps above its equivalent
 
 
 def haiku_ok(type_, c):
