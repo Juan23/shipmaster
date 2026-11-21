@@ -11,6 +11,9 @@ def routed(rows, type_, c, after=None, cycle=False):
     return out.getvalue().split()[1]
 
 
+BOTH_AGY = ["hydrogen-high", "neon-medium"]
+
+
 def row(model, effort, type_="coding", c=3):
     return {"model": perf.MODELS[model], "effort": effort, "type": type_, "complexity": c, "outcome": "pass", "blocker": "none", "task": f"{model}-{effort}"}
 
@@ -28,11 +31,24 @@ class Route(unittest.TestCase):
         self.assertEqual(routed([], "coding", 3, after="hydrogen-high"), "neon-medium")
         self.assertEqual(routed([row("hydrogen", "high")], "coding", 3, after="neon-medium"), "hydrogen-high")
 
+    def test_the_failed_tasks_own_row_does_not_change_where_it_goes_next(self):
+        failed = [row("hydrogen", "high")]
+        self.assertEqual(routed(failed, "coding", 3, after="hydrogen-high"), "neon-medium")
+        self.assertEqual(routed(failed + [row("neon", "medium")], "coding", 3, after=BOTH_AGY), "opus-medium")
+        self.assertEqual(routed(failed, "coding", 3, after=BOTH_AGY), "opus-medium")
+
+    def test_an_in_flight_hydrogen_medium_task_still_gets_its_try_on_neon(self):
+        self.assertEqual(routed([], "coding", 3, after="hydrogen-medium"), "neon-medium")
+
+    def test_a_run_the_environment_stopped_does_not_use_up_a_trial_turn(self):
+        stopped = dict(row("hydrogen", "high"), outcome="fail", blocker="env")
+        self.assertEqual(routed([stopped], "coding", 3), "hydrogen-high")
+
     def test_after_both_agy_models_simple_work_goes_to_haiku_and_the_rest_to_opus_medium(self):
-        self.assertEqual(routed([], "coding", 2, after="neon-medium"), "haiku-medium")
+        self.assertEqual(routed([], "coding", 2, after=BOTH_AGY), "haiku-medium")
         self.assertEqual(routed([], "coding", 2, after="haiku-medium"), "opus-medium")
-        self.assertEqual(routed([], "coding", 3, after="neon-medium"), "opus-medium")
-        self.assertEqual(routed([], "audit", 3, after="neon-medium"), "haiku-medium")
+        self.assertEqual(routed([], "coding", 3, after=BOTH_AGY), "opus-medium")
+        self.assertEqual(routed([], "audit", 3, after=BOTH_AGY), "haiku-medium")
 
     def test_cycle_work_harness_work_and_hard_coding_start_on_opus_medium(self):
         self.assertEqual(routed([], "coding", 3, cycle=True), "opus-medium")
@@ -46,13 +62,14 @@ class Route(unittest.TestCase):
             tier, seen = routed([], "coding", c, cycle=cycle), []
             while tier not in seen:
                 seen.append(tier)
-                tier = routed([], "coding", c, cycle=cycle, after=tier)
+                tier = routed([], "coding", c, cycle=cycle, after=list(seen))
             self.assertFalse({"sonnet-high", "deepseek-high"} & set(seen), seen)
 
     def test_other_work_keeps_its_ladder(self):
         self.assertEqual(routed([], "bug-diagnosis", 2), "hydrogen-high")
         self.assertEqual(routed([], "bug-diagnosis", 4.5), "sonnet-high")
         self.assertEqual(routed([], "bug-diagnosis", 2, after="sonnet-medium"), "sonnet-high")
+        self.assertEqual(routed([], "audit", 4.5), "hydrogen-high")
 
     def test_merges_stay_on_claude(self):
         self.assertEqual(routed([], "merge", 2), "haiku-medium")

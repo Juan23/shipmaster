@@ -23,7 +23,7 @@ Owner, 2026-11-21, from a three-model roundtable. `route` builds the ladder for 
 | Merges | `haiku-medium` (below c2.5) → `sonnet-high` → `opus-medium` → `opus-high` → `opus-xhigh` |
 
 - A mistake in cycle work costs a slow test cycle and one more review round, so that work starts on Opus. Work that local tests can prove starts on agy.
-- The agy tiers are `hydrogen-high` and `neon-medium`, on trial against each other: `route` gives each task to the one with fewer rows of that type at that complexity. The trial is 20 coding rows each. The bar: at most 4 of the 20 need rework or stop on agy's five-hour limit, and its pull requests need no more review rounds than a Claude builder's. The owner reads `stats` and decides; a tier that misses the bar does attacks and audits only.
+- The agy tiers are `hydrogen-high` and `neon-medium`, on trial against each other: `route` gives each task to the one with fewer rows of that type at that complexity. A run that the environment stopped does not count as a turn. The trial is 20 coding tasks each; `stats` shows the count, and the owner reads it and decides. `route` still steps over an agy tier where the log shows it weak, so a weak tier's trial goes on only at other complexities.
 - `sonnet-high` and DeepSeek do not build. DeepSeek is an attacker only (`attack-round`).
 - The agy tiers run from the shell (next section); the rest are agent types in `~/.claude/agents/`.
 - PR reviews use their own agents, not a tier (rule 5).
@@ -35,7 +35,7 @@ Retired, never dispatched: `haiku-high`, `opus-low` (owner, 2026-11-02), `haiku-
 1. Classify the task's **type** (`audit`, `merge`, `cleanup`, `coding`, `bug-diagnosis`, `harness-build`, `device-run`, `harness-fix`, `review`) and score **complexity** 1.0–5.0, one decimal place (1 = mechanical, 3 = one ticket, 5 = multi-platform harness with unknown root cause). Hold both for the row. `audit` finds facts (research, read-only checks); `design` compares ways to build something and reports options with trade-offs, such as a gremlins design scout. Hosted-harness work splits three ways: `harness-build` writes or changes runner, fixture, or checkpoint code; `device-run` executes a packaged iOS/Android run and reports; `harness-fix` diagnoses a failed run, patches, and reruns. Set `--platform ios|android|both` on any task that touches a device (default `none`); it is recorded for stats and does not change routing. Old rows keep the retired type `hosted-harness`; it shows in stats but `route` and `add` reject it.
 2. `perf.py route --type <type> --complexity <#.#>`. Add `--cycle` when a coding or cleanup task ends in a staging or device run. It starts from a complexity floor, drops to a cheaper tier the log has **proven** on similar tasks, and steps over tiers the log shows **weak**.
 3. Spawn with `subagent_type` set to the routed tier, or run the shell command below for a non-Claude tier. Override it only with a reason the log can't see (for example, the task needs a device run the worker must design from scratch), and put that reason in the row's note. Give the worker an attempt cap for device runs.
-4. At complexity 4.5 and above, `route` starts coding and cleanup on `opus-medium` and other work on `sonnet-high`.
+4. **Owner default at c5** (complexity ≥ 4.5; bug diagnosis, design, device runs and merges): spawn `sonnet-high` whatever `route` returns, and start the row's note with `owner-default c5:`. The owner set this on 2026-10-13. Since 2026-11-21 it does not cover coding, cleanup and harness work, which `route` starts on `opus-medium`, or audits, which start on agy.
 5. **Owner default for every PR review**: spawn `pr-reviewer` for a review before the PR is opened and `merge-reviewer` for a review of an open PR, whatever `route` returns, even at c5 (this rule overrides rule 4). Both run the current Opus model at high effort; record the row with `--model opus --effort high`, type `review`, and start its note with `owner-default review:`. The review gate accepts only these two agents, and one fixed reviewer makes the review rows a measure of that reviewer.
 
 ## Non-Claude tiers
@@ -50,18 +50,18 @@ Run each one in its own worktree, as a background command, one writer per set of
 - Always pass the full model name with its effort, so the row's tier stays true if agy's default changes.
 - Wrap the agy call in `perl -e 'alarm shift; exec @ARGV' 1800` for a hard 30-minute limit. Headless agy runs only commands on `permissions.allow` in `~/.gemini/antigravity-cli/settings.json` and one refusal ends its run with no output. A repo script called by its path is refused: tell it to run `bash <script>` or `node <script>`.
 - agy's own safety check refuses two more command shapes even when the command is on the allow list (tested 2026-11-21). Put both lines in every agy brief: "Never use `find -exec`: list the files first, then run the next command on them, or use `rg`." and "Never write the words pkill, killall or kill in a command, not even as search text: read the files with your file tool to find them." Pipes, `&&` and loops run.
-- A run whose JSON has `denied_actions` ended on a refusal. Read the refused command with `grep -o 'user denied permission to run command:\\n.*' ~/.gemini/antigravity-cli/brain/<conversation_id>/.system_generated/logs/transcript_full.jsonl | sed 's/\\nDo not attempt.*//'`, record the row with `blocker: env`, and rerun the same tier with that command shape banned in the brief.
+- A run whose JSON has `denied_actions` ended on a refusal. Read the refused command with `grep -o 'user denied permission to run command:\\n.*' ~/.gemini/antigravity-cli/brain/<conversation_id>/.system_generated/logs/transcript_full.jsonl | sed 's/\\nDo not attempt.*//'`, record the row with `blocker: env`, and rerun the same tier once with that command shape banned in the brief.
 - Ktok: agy's `usage.total_tokens`, in thousands.
-- Fail fast: ping the routed model before real work: `agy -p "Run the shell command echo pong and reply with just its output" --model gemini-4-hydrogen-high --mode accept-edits --print-timeout 60s < /dev/null` must print `pong`.
+- Fail fast: ping the routed model before real work: `agy -p "Run the shell command echo pong and reply with just its output" --model <the routed model> --mode accept-edits --print-timeout 60s < /dev/null` must print `pong`.
 - Both agy tiers draw on one quota, "Gemini Models" in `agy -p /quota`: when it is out, both are out.
-- A tool that fails its ping, is out of quota or is not signed in: record the row with `blocker: env` and route `--after` the second agy tier on the printed ladder. This is the one `env` case that moves up a tier.
+- A tool that fails its ping, is out of quota or is not signed in: record the row with `blocker: env` and route `--after hydrogen-high neon-medium`. This is the one `env` case that moves up a tier.
 
 ## Escalation
 
 When a worker returns `partial`/`fail` with `blocker: model`, self-declines on size, retries blindly, stalls (no progress, or it hits its time limit), or needs a second correction from you: record its row, then `route ... --after <its tier>` for the next one. An `env` blocker (device, host, network, staging drift) keeps the same tier: fix the environment and redispatch. A shell tier that is down is the exception (Non-Claude tiers).
 
-- After a logic or test failure on an agy tier, `--after <that tier>` gives the other agy tier one try.
-- After a refused command or a timeout on agy, skip that try: pass `--after` with the second agy tier on the printed ladder.
+- `--after` takes every tier that stalled on the task, for example `--after hydrogen-high neon-medium`.
+- After a failed agy task, `--after <that tier>` gives the other agy tier one try.
 - Cycle work moves from `opus-medium` to `opus-high` after one failed cycle.
 
 ## Recording

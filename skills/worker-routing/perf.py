@@ -63,7 +63,7 @@ def stats(rows, a):
             print(f"  {str(k):34}{len(v):>4}{c['pass']:>6}{c['partial']:>6}{c['fail']:>6}{100 * c['pass'] / len(v):>6.0f}%{avg:>7.0f}{per:>10}{100 * rw / len(v):>5.0f}%")
         print()
 
-    t = lambda r: f"{r['model'].split('-')[0]}-{r['effort']}"
+    t = row_tier
     table("By tier (non-env):", t, clean)
     table("By type x tier (non-env):", lambda r: f"{r['type']} / {t(r)}", clean)
     table("By platform x tier (non-env, rows with a platform):", lambda r: f"{r['platform']} / {t(r)}", [r for r in clean if r.get("platform") not in (None, "none")])
@@ -87,10 +87,11 @@ AGY = ["hydrogen-high", "neon-medium"]  # the trial pair (owner, 2026-11-21): ro
 OPUS = ["opus-medium", "opus-high", "opus-xhigh"]
 DEEPSEEK, HAIKU = "deepseek-high", "haiku-medium"
 TIERS = [DEEPSEEK] + AGY + [HAIKU, "sonnet-high"] + OPUS  # cheapest first; places an --after tier that is not on the task's ladder
-SHELL = set(AGY)  # non-Claude tiers, run from the shell
+SHELL = set(AGY)  # the Gemini tiers, run from the shell
 CLAUDE_ONLY = ("merge", "review")  # owner: reviews and merges never go to Gemini
 HARNESS = ("harness-build", "harness-fix")
-RETIRED = {"haiku-high": HAIKU, "opus-low": "sonnet-high", "sonnet-medium": HAIKU, "hydrogen-medium": "neon-medium", DEEPSEEK: DEEPSEEK}  # --after a retired tier steps above its equivalent
+C5 = 4.5  # from here up, work starts above the cheapest tiers
+RETIRED = {"haiku-high": HAIKU, "opus-low": "sonnet-high", "haiku-xhigh": HAIKU, "sonnet-medium": HAIKU, "hydrogen-medium": "hydrogen-high"}  # --after a retired tier steps above its equivalent
 
 
 def haiku_ok(type_, c):
@@ -102,14 +103,13 @@ def row_tier(r):
     return f"{r['model'].split('-')[0]}-{r['effort']}"
 
 
-def ladder_for(rows, a):
-    """The tiers a task may use, cheapest first. A mistake in cycle work costs a slow test cycle, so it starts on Opus;
-    work that local tests prove starts on agy."""
+def ladder_for(rows, a, tried):
+    """The tiers a task may still use, cheapest first: Opus where a mistake costs a test cycle, agy where local tests prove the work."""
     t, c = a.type, a.complexity
-    if t in HARNESS or (t in ("coding", "cleanup") and (a.cycle or c >= 4.5)):
+    if t in HARNESS or (t in ("coding", "cleanup") and (a.cycle or c >= C5)):
         return OPUS
-    same = lambda r, x: r["type"] == t and bucket(r) == int(c + 0.5) and row_tier(r) == x
-    agy = sorted(AGY, key=lambda x: sum(same(r, x) for r in rows))
+    same = lambda r, x: r["type"] == t and r.get("blocker") != "env" and bucket(r) == bucket(vars(a)) and row_tier(r) == x
+    agy = [x for x in sorted(AGY, key=lambda x: sum(same(r, x) for r in rows)) if x not in tried]  # a failed run's own row re-sorts the pair, so a tried tier leaves by name
     haiku = [HAIKU] if haiku_ok(t, c) else []
     if t in ("coding", "cleanup", "audit"):
         return agy + haiku + OPUS
@@ -140,7 +140,9 @@ def route(rows, a):
     hardest ones, so a strong tier's failures say little about a cheaper tier with its own record.
     A reworked row loses 0.5: a pass that needed another build/test cycle scores like a partial."""
     rows, reworked = split(rows)
-    ladder = ladder_for(rows, a)
+    stalled = [tier(x) for x in ([a.after] if isinstance(a.after, str) else a.after or [])]
+    tried = [RETIRED.get(x, x) for x in stalled]
+    ladder = ladder_for(rows, a, tried)
     ev = collections.defaultdict(list)
     for r in rows:
         t = row_tier(r)
@@ -150,7 +152,7 @@ def route(rows, a):
     score = {t: sum(val(r) for r in v) / len(v) for t, v in ev.items()}
     proven = [i for i, t in enumerate(ladder) if len(ev[t]) >= 2 and score[t] >= 0.67]
     weak = [i for i, t in enumerate(ladder) if len(ev[t]) >= 2 and score[t] < 0.5]
-    i = ladder.index("sonnet-high") if a.complexity >= 4.5 and "sonnet-high" in ladder else 0
+    i = ladder.index("sonnet-high") if a.complexity >= C5 and "sonnet-high" in ladder else 0
     why = [f"floor {ladder[i]} for c{a.complexity}"]
     if proven and min(proven) < i:
         i = min(proven)
@@ -158,20 +160,15 @@ def route(rows, a):
     while i in weak and i < len(ladder) - 1:
         why.append(f"skipped {ladder[i]}: weak")
         i += 1
-    if a.after:
-        after = tier(a.after)
-        if after in ladder:
-            j = ladder.index(after) + 1
-        else:
-            rank = TIERS.index(RETIRED.get(after, after))
-            j = next((k for k, t in enumerate(ladder) if TIERS.index(t) > rank), len(ladder))
+    for after in tried:
+        if after in AGY:
+            continue
+        j = ladder.index(after) + 1 if after in ladder else next((k for k, t in enumerate(ladder) if TIERS.index(t) > TIERS.index(after)), len(ladder))
         i = max(i, min(j, len(ladder) - 1))
-        why.append(f"after {after} stalled")
+    if stalled:
+        why.append(f"after {', '.join(stalled)} stalled")
     print(f"route: {ladder[i]} ({'; '.join(why)})")
     print("  ladder: " + " > ".join(ladder))
-    if ladder[0] in AGY:
-        n = {x: sum(r["type"] == "coding" and row_tier(r) == x for r in rows) for x in AGY}
-        print("  agy trial, coding rows: " + ", ".join(f"{x} {n[x]}/20" for x in AGY) + ("; both at 20: the owner reads stats and decides" if min(n.values()) >= 20 else ""))
     for t in ladder:
         if ev[t]:
             c = collections.Counter(r["outcome"] for r in ev[t])
@@ -233,7 +230,7 @@ def main():
     ro.add_argument("--type", required=True, choices=TYPES)
     ro.add_argument("--complexity", required=True, type=cx)
     ro.add_argument("--cycle", action="store_true", help="the task ends in a staging or device run")
-    ro.add_argument("--after", choices=list(dict.fromkeys(TIERS + list(RETIRED))), help="tier that just stalled on this task; route goes above it")
+    ro.add_argument("--after", nargs="+", choices=TIERS + list(RETIRED), help="each tier that stalled on this task; route goes past them")
     rw = sub.add_parser("rework", help="a defect found in a worker's accepted output forced another build/test cycle")
     rw.add_argument("--task", required=True, help="exact --task of the worker row that produced the defect")
     rw.add_argument("--cycles", required=True, type=int, help="extra build/test cycles the defect caused (>= 1)")

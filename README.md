@@ -15,7 +15,7 @@ python3 ~/.claude/skills/worker-routing/perf.py route --type coding --complexity
 python3 ~/.claude/skills/worker-routing/perf.py stats
 ```
 
-Work that local tests can prove starts on agy (Gemini, run from the shell): `hydrogen-high` and `neon-medium`, on trial against each other. Work that ends in a staging or device run, harness work and coding at complexity 4.5 and above start on `opus-medium`, then `opus-high` and `opus-xhigh`. Simple work falls back to `haiku-medium`. `sonnet-high` takes bug diagnosis, design, device runs and merges; it does not build, and DeepSeek does not build. PR reviews run on the `pr-reviewer` and `merge-reviewer` agents, which the review gate requires. The Claude tiers are subagent definitions in `agents/`. `skills/worker-routing/SKILL.md` has the full routing rules.
+Work that local tests can prove starts on agy (Gemini, run from the shell): `hydrogen-high` and `neon-medium`, on trial against each other. Coding and cleanup that end in a staging or device run, harness work, and coding and cleanup at complexity 4.5 and above start on `opus-medium`, then `opus-high` and `opus-xhigh`. Simple work falls back to `haiku-medium`. `sonnet-high` takes bug diagnosis, design, device runs and merges; it does not build, and DeepSeek does not build. PR reviews run on the `pr-reviewer` and `merge-reviewer` agents, which the review gate requires. The Claude tiers are subagent definitions in `agents/`. `skills/worker-routing/SKILL.md` has the full routing rules.
 
 The log has one JSON line per worker and per rework, and is shared by every project on the machine: `~/.claude/skills/worker-routing/agent-performance-log.jsonl`. It never goes in this repo, and `.gitignore` blocks it if it ends up here.
 
