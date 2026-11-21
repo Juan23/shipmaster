@@ -7,11 +7,8 @@ import perf
 def routed(rows, type_, c, after=None, cycle=False):
     out = io.StringIO()
     with contextlib.redirect_stdout(out):
-        perf.route(rows, SimpleNamespace(type=type_, complexity=c, after=after, cycle=cycle))
+        perf.route(rows, SimpleNamespace(type=type_, complexity=c, after=[after] if isinstance(after, str) else after, cycle=cycle))
     return out.getvalue().split()[1]
-
-
-BOTH_AGY = ["hydrogen-high", "neon-medium"]
 
 
 def row(model, effort, type_="coding", c=3):
@@ -34,8 +31,8 @@ class Route(unittest.TestCase):
     def test_the_failed_tasks_own_row_does_not_change_where_it_goes_next(self):
         failed = [row("hydrogen", "high")]
         self.assertEqual(routed(failed, "coding", 3, after="hydrogen-high"), "neon-medium")
-        self.assertEqual(routed(failed + [row("neon", "medium")], "coding", 3, after=BOTH_AGY), "opus-medium")
-        self.assertEqual(routed(failed, "coding", 3, after=BOTH_AGY), "opus-medium")
+        self.assertEqual(routed(failed + [row("neon", "medium")], "coding", 3, after=perf.AGY), "opus-medium")
+        self.assertEqual(routed(failed, "coding", 3, after=perf.AGY), "opus-medium")
 
     def test_an_in_flight_hydrogen_medium_task_still_gets_its_try_on_neon(self):
         self.assertEqual(routed([], "coding", 3, after="hydrogen-medium"), "neon-medium")
@@ -45,10 +42,10 @@ class Route(unittest.TestCase):
         self.assertEqual(routed([stopped], "coding", 3), "hydrogen-high")
 
     def test_after_both_agy_models_simple_work_goes_to_haiku_and_the_rest_to_opus_medium(self):
-        self.assertEqual(routed([], "coding", 2, after=BOTH_AGY), "haiku-medium")
+        self.assertEqual(routed([], "coding", 2, after=perf.AGY), "haiku-medium")
         self.assertEqual(routed([], "coding", 2, after="haiku-medium"), "opus-medium")
-        self.assertEqual(routed([], "coding", 3, after=BOTH_AGY), "opus-medium")
-        self.assertEqual(routed([], "audit", 3, after=BOTH_AGY), "haiku-medium")
+        self.assertEqual(routed([], "coding", 3, after=perf.AGY), "opus-medium")
+        self.assertEqual(routed([], "audit", 3, after=perf.AGY), "haiku-medium")
 
     def test_cycle_work_harness_work_and_hard_coding_start_on_opus_medium(self):
         self.assertEqual(routed([], "coding", 3, cycle=True), "opus-medium")
@@ -70,6 +67,13 @@ class Route(unittest.TestCase):
         self.assertEqual(routed([], "bug-diagnosis", 4.5), "sonnet-high")
         self.assertEqual(routed([], "bug-diagnosis", 2, after="sonnet-medium"), "sonnet-high")
         self.assertEqual(routed([], "audit", 4.5), "hydrogen-high")
+        self.assertEqual(routed([], "cleanup", 4.5), "hydrogen-high")
+        self.assertEqual(routed([], "cleanup", 3, cycle=True), "hydrogen-high")
+
+    def test_neon_is_on_trial_for_building_and_audits_only(self):
+        hydrogen_ran = [row("hydrogen", "high", "bug-diagnosis", 2), row("hydrogen", "high", "device-run", 3)]
+        self.assertEqual(routed(hydrogen_ran, "bug-diagnosis", 2), "hydrogen-high")
+        self.assertEqual(routed(hydrogen_ran, "device-run", 3, after="hydrogen-high"), "sonnet-high")
 
     def test_merges_stay_on_claude(self):
         self.assertEqual(routed([], "merge", 2), "haiku-medium")
@@ -82,6 +86,15 @@ class Route(unittest.TestCase):
     def test_gemini_rows_key_to_their_tiers(self):
         self.assertEqual(perf.tier(f"{perf.MODELS['neon']}/medium"), "neon-medium")
         self.assertEqual(perf.tier(f"{perf.MODELS['hydrogen']}/medium"), "hydrogen-medium")
+
+
+class Stats(unittest.TestCase):
+    def test_stats_prints_every_table(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            perf.stats([dict(row("hydrogen", "high"), platform="ios", escalated_from="neon-medium", ktok=10)], SimpleNamespace(type=None))
+        for title in ("By tier", "By type x tier", "By platform x tier", "By complexity x tier"):
+            self.assertIn(title, out.getvalue())
 
 
 class Add(unittest.TestCase):
