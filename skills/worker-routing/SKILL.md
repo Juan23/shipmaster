@@ -14,8 +14,8 @@ Every dispatch is routed here: builds, fixes and check runs, reviews (rule 5), m
 ## Tiers
 
 Cheapest first (owner, 2026-11-19):
-`hydrogen-medium` → `sonnet-high` → `opus-medium` → `opus-high` → `opus-xhigh`.
-`hydrogen-medium` is the default worker below c4.5 and runs from the shell (next section); the rest are agent types in `~/.claude/agents/`. Merges skip the shell tiers.
+`neon-medium` → `sonnet-high` → `opus-medium` → `opus-high` → `opus-xhigh`.
+`neon-medium` is the default worker below c4.5 and runs from the shell (next section); when Neon is out of quota, `hydrogen-medium` runs in its place (owner, 2026-11-21); the rest are agent types in `~/.claude/agents/`. Merges skip the shell tiers.
 PR reviews use their own agents, not a tier (rule 5).
 
 Below the ladder, for the work the log shows Haiku doing reliably (audits at any complexity; cleanup, merge and simple coding below c2.5): `deepseek-high` first, then `haiku-medium` if DeepSeek fails (owner, 2026-11-19). Merges skip DeepSeek and start at `haiku-medium`. Everywhere else `route` returns neither.
@@ -37,13 +37,15 @@ Run each one in its own worktree, as a background command, one writer per set of
 | Tier | Command |
 |---|---|
 | `deepseek-high` | The call in the `opencode-worker` skill (`opencode-go/deepseek-v4.1-flash#high`). |
-| `hydrogen-medium` | `agy -p "<task>" --model gemini-4-hydrogen-medium --mode accept-edits --print-timeout 1770s --output-format json < /dev/null` |
+| `neon-medium` | `agy -p "<task>" --model gemini-4-neon-medium --mode accept-edits --print-timeout 1770s --output-format json < /dev/null` |
+| `hydrogen-medium` | The same call with `--model gemini-4-hydrogen-medium`. Only when Neon is out of quota. |
 
-- Medium is agy's own default for Hydrogen (the bare name resolves to `-medium`); the explicit name keeps the row's tier true if that default changes.
-- Wrap the agy call in `perl -e 'alarm shift; exec @ARGV' 1800` for a hard 30-minute limit. Headless agy refuses any command with a `*` wildcard, and one refusal ends its run: say so in the task.
+- Always pass the full model name with its effort, so the row's tier stays true if agy's default changes.
+- Wrap the agy call in `perl -e 'alarm shift; exec @ARGV' 1800` for a hard 30-minute limit. Headless agy runs only commands on `permissions.allow` in `~/.gemini/antigravity-cli/settings.json` and one refusal ends its run with no output. A repo script called by its path is refused: tell it to run `bash <script>` or `node <script>`.
 - Ktok: opencode's `step_finish` tokens or agy's `usage.total_tokens`, in thousands.
-- Fail fast: ping before real work. `opencode-worker` has DeepSeek's; for agy, `agy -p "Reply with just: pong" --model gemini-4-hydrogen-medium --print-timeout 60s` must print `pong`.
-- A tool that fails its ping, is out of quota or is not signed in: record the row with `blocker: env` and route `--after` that tier (Hydrogen goes to `sonnet-high`, DeepSeek to `haiku-medium`). This is the one `env` case that moves up a tier.
+- Fail fast: ping before real work. `opencode-worker` has DeepSeek's; for agy, `agy -p "Run the shell command echo pong and reply with just its output" --model gemini-4-neon-medium --mode accept-edits --print-timeout 60s < /dev/null` must print `pong`.
+- Neon out of quota: record its row with `blocker: env`, then ping and run `hydrogen-medium` with the same task.
+- A tool that fails its ping, is out of quota or is not signed in (for Neon, once Hydrogen has failed too): record the row with `blocker: env` and route `--after` that tier (Neon and Hydrogen go to `sonnet-high`, DeepSeek to `haiku-medium`). This is the one `env` case that moves up a tier.
 
 ## Escalation
 
@@ -54,7 +56,7 @@ When a worker returns `partial`/`fail` with `blocker: model`, self-declines on s
 After **each** worker finishes, append its row before acting on the result:
 
 ```bash
-python3 ~/.claude/skills/worker-routing/perf.py add --model hydrogen --effort medium --type coding --platform none --task "#88 capacity copy fix" --complexity 3 --outcome pass --blocker none --attempts 0 --interventions 0 --ktok 194 --note "one line: what happened and why"
+python3 ~/.claude/skills/worker-routing/perf.py add --model neon --effort medium --type coding --platform none --task "#88 capacity copy fix" --complexity 3 --outcome pass --blocker none --attempts 0 --interventions 0 --ktok 194 --note "one line: what happened and why"
 ```
 
 - `ktok`: exact `subagent_tokens` from the task-notification `<usage>`, in thousands.

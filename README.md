@@ -15,7 +15,7 @@ python3 ~/.claude/skills/worker-routing/perf.py route --type coding --complexity
 python3 ~/.claude/skills/worker-routing/perf.py stats
 ```
 
-The tiers, cheapest first, are `hydrogen-medium` (Gemini, run from the shell, the default worker), then `sonnet-high`, `opus-medium`, `opus-high` and `opus-xhigh`. Audits and research, and cleanup, merge and simple coding below complexity 2.5, start below them on `deepseek-high` and fall back to `haiku-medium`; merges skip DeepSeek. PR reviews run on the `pr-reviewer` and `merge-reviewer` agents, which the review gate requires. The Claude tiers are subagent definitions in `agents/`. `skills/worker-routing/SKILL.md` has the full routing rules.
+The tiers, cheapest first, are `neon-medium` (Gemini, run from the shell, the default worker; `hydrogen-medium` when Neon is out of quota), then `sonnet-high`, `opus-medium`, `opus-high` and `opus-xhigh`. Audits and research, and cleanup, merge and simple coding below complexity 2.5, start below them on `deepseek-high` and fall back to `haiku-medium`; merges skip DeepSeek. PR reviews run on the `pr-reviewer` and `merge-reviewer` agents, which the review gate requires. The Claude tiers are subagent definitions in `agents/`. `skills/worker-routing/SKILL.md` has the full routing rules.
 
 The log has one JSON line per worker and per rework, and is shared by every project on the machine: `~/.claude/skills/worker-routing/agent-performance-log.jsonl`. It never goes in this repo, and `.gitignore` blocks it if it ends up here.
 

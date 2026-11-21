@@ -7,7 +7,7 @@ import argparse, collections, json, os, sys
 from datetime import date
 
 MODELS = {"haiku": "haiku-5.5", "sonnet": "sonnet-5.5", "opus": "opus-5.5",
-          "deepseek": "deepseek-v4.1-flash", "hydrogen": "hydrogen-gemini-4"}  # first word is the tier name
+          "deepseek": "deepseek-v4.1-flash", "hydrogen": "hydrogen-gemini-4", "neon": "neon-gemini-4"}  # first word is the tier name
 EFFORTS = ["low", "medium", "high", "xhigh", "max", "unknown"]
 TYPES = ["audit", "design", "merge", "cleanup", "coding", "bug-diagnosis", "harness-build", "device-run", "harness-fix", "review"]
 LEGACY_TYPES = ["hosted-harness"]  # pre-split rows; readable in stats, not accepted by add/route
@@ -83,12 +83,13 @@ def stats(rows, a):
             print(f"  {t:34}{len(v):>3} reworks, {sum(r['cycles'] for r in v)} rebuild/retest cycles, {sum(r.get('wall_min') or 0 for r in v):.0f} min")
 
 
-LADDER = ["hydrogen-medium", "sonnet-high", "opus-medium", "opus-high", "opus-xhigh"]
+LADDER = ["neon-medium", "sonnet-high", "opus-medium", "opus-high", "opus-xhigh"]
 DEEPSEEK, HAIKU = "deepseek-high", "haiku-medium"  # below the ladder, only for the work haiku_ok allows (owner, 2026-11-19)
 BELOW = [DEEPSEEK, HAIKU]
-SHELL = {DEEPSEEK, "hydrogen-medium"}  # non-Claude tiers, run from the shell
+NEON_FALLBACK = "hydrogen-medium"  # runs only when Neon is out of quota (owner, 2026-11-21)
+SHELL = {DEEPSEEK, "neon-medium", NEON_FALLBACK}  # non-Claude tiers, run from the shell
 CLAUDE_ONLY = ("merge", "review")  # owner: reviews and merges never go to DeepSeek or Gemini
-RETIRED = {"haiku-high": HAIKU, "opus-low": "sonnet-high", "sonnet-medium": "hydrogen-medium"}  # --after a retired tier steps above its equivalent
+RETIRED = {"haiku-high": HAIKU, "opus-low": "sonnet-high", "sonnet-medium": "neon-medium", NEON_FALLBACK: "neon-medium"}  # --after one of these steps above its equivalent
 
 
 def haiku_ok(type_, c):

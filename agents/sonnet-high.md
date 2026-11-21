@@ -1,6 +1,6 @@
 ---
 name: sonnet-high
-description: Sonnet worker at high effort. Escalation tier after hydrogen-medium; next is opus-medium.
+description: Sonnet worker at high effort. Escalation tier after neon-medium; next is opus-medium.
 model: sonnet
 effort: high
 ---
