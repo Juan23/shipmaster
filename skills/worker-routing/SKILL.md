@@ -41,6 +41,8 @@ Run each one in its own worktree, as a background command, one writer per set of
 
 - Always pass the full model name with its effort, so the row's tier stays true if agy's default changes.
 - Wrap the agy call in `perl -e 'alarm shift; exec @ARGV' 1800` for a hard 30-minute limit. Headless agy runs only commands on `permissions.allow` in `~/.gemini/antigravity-cli/settings.json` and one refusal ends its run with no output. A repo script called by its path is refused: tell it to run `bash <script>` or `node <script>`.
+- agy's own safety check refuses two more command shapes even when the command is on the allow list (tested 2026-11-21). Put both lines in every agy brief: "Never use `find -exec`: list the files first, then run the next command on them, or use `rg`." and "Never write the words pkill, killall or kill in a command, not even as search text: read the files with your file tool to find them." Pipes, `&&` and loops run.
+- A run whose JSON has `denied_actions` ended on a refusal. Read the refused command with `grep -o 'user denied permission to run command:[^"]*' ~/.gemini/antigravity-cli/brain/<conversation_id>/.system_generated/logs/transcript_full.jsonl`, record the row with `blocker: env`, and rerun the same tier with that command shape banned in the brief.
 - Ktok: opencode's `step_finish` tokens or agy's `usage.total_tokens`, in thousands.
 - Fail fast: ping before real work. `opencode-worker` has DeepSeek's; for agy, `agy -p "Run the shell command echo pong and reply with just its output" --model gemini-4-neon-medium --mode accept-edits --print-timeout 60s < /dev/null` must print `pong`.
 - Neon and Hydrogen share one agy quota, "Gemini Models" in `agy -p /quota`, so Hydrogen cannot stand in when Neon is out.
