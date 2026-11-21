@@ -22,7 +22,7 @@ From the branch's checkout, as a background command (it ends within about 24 min
 ~/.claude/skills/attack-round/attack-round.sh --base origin/main --focus security,failure,timing --builder <tier> --out "$SCRATCH/attack-round"
 ```
 
-- `--builder` is the worker-routing tier that wrote the code. A reviewer differs from the builder's model where it can: for a `hydrogen-*` builder, agy starts on Argon medium and falls back to Hydrogen. When only the builder's own model answers, it still reviews, and its status line ends `- same model as the builder`.
+- `--builder` is the worker-routing tier that wrote the code. A reviewer differs from the builder's model where it can: for a `hydrogen-*` or `neon-*` builder, agy starts on Argon medium and falls back to Hydrogen. When only the builder's own model answers, it still reviews, and its status line ends `- same model as the builder`.
 - It pings DeepSeek and agy first and skips any that do not answer. agy starts on the first of its two models that answers, so a primary that is down or out of quota costs only its ping.
 - Each reviewer gets 20 minutes (`ATTACK_LIMIT`, seconds; Argon high needed 15 to 20 minutes in testing, Hydrogen high 4). A stalled reviewer is killed with all its child processes, and the round goes on with what arrived.
 - agy uses Hydrogen high (owner, 2026-11-17: it took 4 minutes on a review where Argon medium took 11.5 and Argon high timed out). If Hydrogen fails fast (quota, error), it retries once on Argon medium. If headless agy refuses a command (it refuses any `*` wildcard, and one refusal ends its run), it retries once on the same model and is told which command was refused. A timeout does not retry, and a retry only gets the time left.

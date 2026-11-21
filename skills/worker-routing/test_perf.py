@@ -4,38 +4,61 @@ from types import SimpleNamespace
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import perf
 
-def routed(rows, type_, c, after=None):
+def routed(rows, type_, c, after=None, cycle=False):
     out = io.StringIO()
     with contextlib.redirect_stdout(out):
-        perf.route(rows, SimpleNamespace(type=type_, complexity=c, after=after))
+        perf.route(rows, SimpleNamespace(type=type_, complexity=c, after=after, cycle=cycle))
     return out.getvalue().split()[1]
 
 
+def row(model, effort, type_="coding", c=3):
+    return {"model": perf.MODELS[model], "effort": effort, "type": type_, "complexity": c, "outcome": "pass", "blocker": "none", "task": f"{model}-{effort}"}
+
+
 class Route(unittest.TestCase):
-    def test_default_worker_is_hydrogen_high(self):
+    def test_local_test_building_and_audits_start_on_agy(self):
+        for type_, c in (("coding", 2), ("coding", 4), ("cleanup", 3), ("audit", 3)):
+            self.assertEqual(routed([], type_, c), "hydrogen-high")
+
+    def test_the_agy_trial_gives_the_next_task_to_the_model_with_fewer_rows_at_that_complexity(self):
+        self.assertEqual(routed([row("hydrogen", "high")], "coding", 3), "neon-medium")
+        self.assertEqual(routed([row("hydrogen", "high", c=2)], "coding", 4), "hydrogen-high")
+
+    def test_a_failed_agy_task_gets_one_try_on_the_other_agy_model(self):
+        self.assertEqual(routed([], "coding", 3, after="hydrogen-high"), "neon-medium")
+        self.assertEqual(routed([row("hydrogen", "high")], "coding", 3, after="neon-medium"), "hydrogen-high")
+
+    def test_after_both_agy_models_simple_work_goes_to_haiku_and_the_rest_to_opus_medium(self):
+        self.assertEqual(routed([], "coding", 2, after="neon-medium"), "haiku-medium")
+        self.assertEqual(routed([], "coding", 2, after="haiku-medium"), "opus-medium")
+        self.assertEqual(routed([], "coding", 3, after="neon-medium"), "opus-medium")
+        self.assertEqual(routed([], "audit", 3, after="neon-medium"), "haiku-medium")
+
+    def test_cycle_work_harness_work_and_hard_coding_start_on_opus_medium(self):
+        self.assertEqual(routed([], "coding", 3, cycle=True), "opus-medium")
+        self.assertEqual(routed([], "harness-build", 2), "opus-medium")
+        self.assertEqual(routed([], "harness-fix", 3), "opus-medium")
+        self.assertEqual(routed([], "coding", 4.5), "opus-medium")
+        self.assertEqual(routed([], "coding", 3, cycle=True, after="opus-medium"), "opus-high")
+
+    def test_sonnet_and_deepseek_never_build(self):
+        for c, cycle in ((2, False), (3, False), (3, True), (5, False)):
+            tier, seen = routed([], "coding", c, cycle=cycle), []
+            while tier not in seen:
+                seen.append(tier)
+                tier = routed([], "coding", c, cycle=cycle, after=tier)
+            self.assertFalse({"sonnet-high", "deepseek-high"} & set(seen), seen)
+
+    def test_other_work_keeps_its_ladder(self):
         self.assertEqual(routed([], "bug-diagnosis", 2), "hydrogen-high")
-        self.assertEqual(routed([], "coding", 4), "hydrogen-high")
-
-    def test_after_hydrogen_or_a_retired_gemini_tier_goes_to_sonnet_high(self):
-        for stalled in ("hydrogen-high", "neon-medium", "hydrogen-medium"):
-            self.assertEqual(routed([], "coding", 3, after=stalled), "sonnet-high")
-
-    def test_c5_floor_is_sonnet_high(self):
         self.assertEqual(routed([], "bug-diagnosis", 4.5), "sonnet-high")
-
-    def test_haiku_work_starts_on_deepseek_then_haiku(self):
-        self.assertEqual(routed([], "audit", 3), "deepseek-high")
-        self.assertEqual(routed([], "coding", 2), "deepseek-high")
-        self.assertEqual(routed([], "audit", 3, after="deepseek-high"), "haiku-medium")
-
-    def test_after_an_in_flight_sonnet_medium_goes_to_sonnet_high(self):
         self.assertEqual(routed([], "bug-diagnosis", 2, after="sonnet-medium"), "sonnet-high")
 
     def test_merges_stay_on_claude(self):
         self.assertEqual(routed([], "merge", 2), "haiku-medium")
         self.assertEqual(routed([], "merge", 3), "sonnet-high")
 
-    def test_after_a_shell_tier_a_low_merge_never_drops_below_it(self):
+    def test_after_a_retired_tier_a_low_merge_never_drops_below_it(self):
         self.assertEqual(routed([], "merge", 2, after="sonnet-medium"), "sonnet-high")
         self.assertEqual(routed([], "merge", 2, after="deepseek-high"), "haiku-medium")
 

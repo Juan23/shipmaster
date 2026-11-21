@@ -26,7 +26,7 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$BASE" ] || { echo "usage: attack-round.sh --base <ref> [--focus a,b] [--builder tier] [--out dir]" >&2; exit 2; }
 # A reviewer differs from the builder where it can; the builder's own model still reviews when nothing else answers.
-case "$BUILDER" in hydrogen*) PRIMARY="$BACKUP" BACKUP="gemini-4-hydrogen-high";; esac
+case "$BUILDER" in hydrogen*|neon*) PRIMARY="$BACKUP" BACKUP="gemini-4-hydrogen-high";; esac
 same_model_note() { # same_model_note <status> <text naming the model>: only a reviewer that answered counts
   [ -n "$BUILDER" ] || return 0
   case "$1" in done*) case "$2" in *"${BUILDER%%-*}"*) echo " - same model as the builder";; esac;; esac
