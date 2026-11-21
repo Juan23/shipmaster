@@ -15,12 +15,12 @@ Every dispatch is routed here: builds, fixes and check runs, reviews (rule 5), m
 
 Cheapest first (owner, 2026-11-19):
 `hydrogen-high` → `sonnet-high` → `opus-medium` → `opus-high` → `opus-xhigh`.
-`hydrogen-high` is the default worker below c4.5 and runs from the shell (next section). It is on trial (owner, 2026-11-21): it stays the default until the owner reads `stats` and decides. The rest are agent types in `~/.claude/agents/`. Merges skip the shell tiers.
+`hydrogen-high` is the default worker below c4.5 and runs from the shell (next section). It is on trial (owner, 2026-11-21): the owner reads `stats` later and decides whether it stays. Until then follow `route`, which still steps over it where the log shows it weak. The rest are agent types in `~/.claude/agents/`. Merges skip the shell tiers.
 PR reviews use their own agents, not a tier (rule 5).
 
 Below the ladder, for the work the log shows Haiku doing reliably (audits at any complexity; cleanup, merge and simple coding below c2.5): `deepseek-high` first, then `haiku-medium` if DeepSeek fails (owner, 2026-11-19). Merges skip DeepSeek and start at `haiku-medium`. Everywhere else `route` returns neither.
 
-Retired, never dispatched: `haiku-high`, `opus-low` (owner, 2026-11-02), `haiku-xhigh` (2026-10-22), `sonnet-medium` (2026-11-19), `hydrogen-medium` and `neon-medium` (both 2026-11-21; Neon used too much of the agy quota). `--after` any of these three goes to `sonnet-high`. Old rows stay in `stats`.
+Retired, never dispatched: `haiku-high`, `opus-low` (owner, 2026-11-02), `haiku-xhigh` (2026-10-22), `sonnet-medium` (2026-11-19), `hydrogen-medium` and `neon-medium` (both 2026-11-21; Neon used too much of the agy quota). `--after sonnet-medium`, `--after hydrogen-medium` or `--after neon-medium` goes to `sonnet-high`. Old rows stay in `stats`.
 
 ## Dispatch
 
@@ -45,12 +45,12 @@ Run each one in its own worktree, as a background command, one writer per set of
 - A run whose JSON has `denied_actions` ended on a refusal. Read the refused command with `grep -o 'user denied permission to run command:\\n.*' ~/.gemini/antigravity-cli/brain/<conversation_id>/.system_generated/logs/transcript_full.jsonl | sed 's/\\nDo not attempt.*//'`, record the row with `blocker: env`, and rerun the same tier with that command shape banned in the brief.
 - Ktok: opencode's `step_finish` tokens or agy's `usage.total_tokens`, in thousands.
 - Fail fast: ping before real work. `opencode-worker` has DeepSeek's; for agy, `agy -p "Run the shell command echo pong and reply with just its output" --model gemini-4-hydrogen-high --mode accept-edits --print-timeout 60s < /dev/null` must print `pong`.
-- Neon and Hydrogen share one agy quota, "Gemini Models" in `agy -p /quota`, so Neon cannot stand in when Hydrogen is out.
+- Hydrogen draws on the "Gemini Models" quota in `agy -p /quota`. No other agy model stands in for it.
 - A tool that fails its ping, is out of quota or is not signed in: record the row with `blocker: env` and route `--after` that tier (Hydrogen goes to `sonnet-high`, DeepSeek to `haiku-medium`). This is the one `env` case that moves up a tier.
 
 ## Escalation
 
-When a worker returns `partial`/`fail` with `blocker: model`, self-declines on size, retries blindly, or needs a second correction from you: record its row, then `route ... --after <its tier>` for the next one. An `env` blocker (device, host, network, staging drift) keeps the same tier: fix the environment and redispatch. A shell tier that is down is the exception (Non-Claude tiers).
+When a worker returns `partial`/`fail` with `blocker: model`, self-declines on size, retries blindly, stalls (no progress, or it hits its time limit), or needs a second correction from you: record its row, then `route ... --after <its tier>` for the next one. An `env` blocker (device, host, network, staging drift) keeps the same tier: fix the environment and redispatch. A shell tier that is down is the exception (Non-Claude tiers).
 
 ## Recording
 
