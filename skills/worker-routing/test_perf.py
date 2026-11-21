@@ -12,13 +12,13 @@ def routed(rows, type_, c, after=None):
 
 
 class Route(unittest.TestCase):
-    def test_default_worker_is_neon(self):
-        self.assertEqual(routed([], "bug-diagnosis", 2), "neon-medium")
-        self.assertEqual(routed([], "coding", 4), "neon-medium")
+    def test_default_worker_is_hydrogen_high(self):
+        self.assertEqual(routed([], "bug-diagnosis", 2), "hydrogen-high")
+        self.assertEqual(routed([], "coding", 4), "hydrogen-high")
 
-    def test_after_neon_or_retired_hydrogen_goes_to_sonnet_high(self):
-        self.assertEqual(routed([], "coding", 3, after="neon-medium"), "sonnet-high")
-        self.assertEqual(routed([], "coding", 3, after="hydrogen-medium"), "sonnet-high")
+    def test_after_hydrogen_or_a_retired_gemini_tier_goes_to_sonnet_high(self):
+        for stalled in ("hydrogen-high", "neon-medium", "hydrogen-medium"):
+            self.assertEqual(routed([], "coding", 3, after=stalled), "sonnet-high")
 
     def test_c5_floor_is_sonnet_high(self):
         self.assertEqual(routed([], "bug-diagnosis", 4.5), "sonnet-high")
