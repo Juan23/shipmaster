@@ -43,7 +43,7 @@ Run each one in its own worktree, as a background command, one writer per set of
 - Wrap the agy call in `perl -e 'alarm shift; exec @ARGV' 1800` for a hard 30-minute limit. Headless agy runs only commands on `permissions.allow` in `~/.gemini/antigravity-cli/settings.json` and one refusal ends its run with no output. A repo script called by its path is refused: tell it to run `bash <script>` or `node <script>`.
 - Ktok: opencode's `step_finish` tokens or agy's `usage.total_tokens`, in thousands.
 - Fail fast: ping before real work. `opencode-worker` has DeepSeek's; for agy, `agy -p "Run the shell command echo pong and reply with just its output" --model gemini-4-neon-medium --mode accept-edits --print-timeout 60s < /dev/null` must print `pong`.
-- Every Gemini model except Argon draws on one shared agy quota (`agy -p /quota` shows it), so when Neon is out, Hydrogen is out too.
+- Neon and Hydrogen share one agy quota, "Gemini Models" in `agy -p /quota`, so Hydrogen cannot stand in when Neon is out.
 - A tool that fails its ping, is out of quota or is not signed in: record the row with `blocker: env` and route `--after` that tier (Neon goes to `sonnet-high`, DeepSeek to `haiku-medium`). This is the one `env` case that moves up a tier.
 
 ## Escalation
