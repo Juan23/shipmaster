@@ -16,7 +16,7 @@ class Route(unittest.TestCase):
         self.assertEqual(routed([], "bug-diagnosis", 2), "neon-medium")
         self.assertEqual(routed([], "coding", 4), "neon-medium")
 
-    def test_after_neon_or_its_hydrogen_fallback_goes_to_sonnet_high(self):
+    def test_after_neon_or_retired_hydrogen_goes_to_sonnet_high(self):
         self.assertEqual(routed([], "coding", 3, after="neon-medium"), "sonnet-high")
         self.assertEqual(routed([], "coding", 3, after="hydrogen-medium"), "sonnet-high")
 

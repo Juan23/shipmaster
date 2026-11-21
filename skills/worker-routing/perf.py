@@ -86,10 +86,9 @@ def stats(rows, a):
 LADDER = ["neon-medium", "sonnet-high", "opus-medium", "opus-high", "opus-xhigh"]
 DEEPSEEK, HAIKU = "deepseek-high", "haiku-medium"  # below the ladder, only for the work haiku_ok allows (owner, 2026-11-19)
 BELOW = [DEEPSEEK, HAIKU]
-NEON_FALLBACK = "hydrogen-medium"  # runs only when Neon is out of quota (owner, 2026-11-21)
-SHELL = {DEEPSEEK, "neon-medium", NEON_FALLBACK}  # non-Claude tiers, run from the shell
+SHELL = {DEEPSEEK, "neon-medium"}  # non-Claude tiers, run from the shell
 CLAUDE_ONLY = ("merge", "review")  # owner: reviews and merges never go to DeepSeek or Gemini
-AFTER_EQUIVALENT = {"haiku-high": HAIKU, "opus-low": "sonnet-high", "sonnet-medium": "neon-medium", NEON_FALLBACK: "neon-medium"}
+RETIRED = {"haiku-high": HAIKU, "opus-low": "sonnet-high", "sonnet-medium": "neon-medium", "hydrogen-medium": "neon-medium"}  # --after a retired tier steps above its equivalent
 
 
 def haiku_ok(type_, c):
@@ -145,7 +144,7 @@ def route(rows, a):
         why.append(f"skipped {ladder[i]}: weak")
         i += 1
     if a.after:
-        after = AFTER_EQUIVALENT.get(tier(a.after), tier(a.after))
+        after = RETIRED.get(tier(a.after), tier(a.after))
         rank = (BELOW + LADDER).index  # after may be a tier missing from this ladder (shell or below-ladder)
         i = max(i, next((j for j, t in enumerate(ladder) if rank(t) > rank(after)), len(ladder) - 1))
         why.append(f"after {tier(a.after)} stalled")
@@ -210,7 +209,7 @@ def main():
     ro = sub.add_parser("route")
     ro.add_argument("--type", required=True, choices=TYPES)
     ro.add_argument("--complexity", required=True, type=cx)
-    ro.add_argument("--after", choices=BELOW + LADDER + list(AFTER_EQUIVALENT), help="tier that just stalled on this task; route goes above it")
+    ro.add_argument("--after", choices=BELOW + LADDER + list(RETIRED), help="tier that just stalled on this task; route goes above it")
     rw = sub.add_parser("rework", help="a defect found in a worker's accepted output forced another build/test cycle")
     rw.add_argument("--task", required=True, help="exact --task of the worker row that produced the defect")
     rw.add_argument("--cycles", required=True, type=int, help="extra build/test cycles the defect caused (>= 1)")

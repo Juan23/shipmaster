@@ -15,12 +15,12 @@ Every dispatch is routed here: builds, fixes and check runs, reviews (rule 5), m
 
 Cheapest first (owner, 2026-11-19):
 `neon-medium` → `sonnet-high` → `opus-medium` → `opus-high` → `opus-xhigh`.
-`neon-medium` is the default worker below c4.5 and runs from the shell (next section); when Neon is out of quota, `hydrogen-medium` runs in its place (owner, 2026-11-21); the rest are agent types in `~/.claude/agents/`. Merges skip the shell tiers.
+`neon-medium` is the default worker below c4.5 and runs from the shell (next section); the rest are agent types in `~/.claude/agents/`. Merges skip the shell tiers.
 PR reviews use their own agents, not a tier (rule 5).
 
 Below the ladder, for the work the log shows Haiku doing reliably (audits at any complexity; cleanup, merge and simple coding below c2.5): `deepseek-high` first, then `haiku-medium` if DeepSeek fails (owner, 2026-11-19). Merges skip DeepSeek and start at `haiku-medium`. Everywhere else `route` returns neither.
 
-Retired, never dispatched: `haiku-high`, `opus-low` (owner, 2026-11-02), `haiku-xhigh` (2026-10-22) and `sonnet-medium` (2026-11-19; `--after sonnet-medium` goes to `sonnet-high`). Old rows stay in `stats`.
+Retired, never dispatched: `haiku-high`, `opus-low` (owner, 2026-11-02), `haiku-xhigh` (2026-10-22), `sonnet-medium` (2026-11-19; `--after sonnet-medium` goes to `sonnet-high`) and `hydrogen-medium` (2026-11-21, replaced by Neon; `--after hydrogen-medium` goes to `sonnet-high`). Old rows stay in `stats`.
 
 ## Dispatch
 
@@ -38,14 +38,13 @@ Run each one in its own worktree, as a background command, one writer per set of
 |---|---|
 | `deepseek-high` | The call in the `opencode-worker` skill (`opencode-go/deepseek-v4.1-flash#high`). |
 | `neon-medium` | `agy -p "<task>" --model gemini-4-neon-medium --mode accept-edits --print-timeout 1770s --output-format json < /dev/null` |
-| `hydrogen-medium` | The same call with `--model gemini-4-hydrogen-medium`. Only when Neon is out of quota. |
 
 - Always pass the full model name with its effort, so the row's tier stays true if agy's default changes.
 - Wrap the agy call in `perl -e 'alarm shift; exec @ARGV' 1800` for a hard 30-minute limit. Headless agy runs only commands on `permissions.allow` in `~/.gemini/antigravity-cli/settings.json` and one refusal ends its run with no output. A repo script called by its path is refused: tell it to run `bash <script>` or `node <script>`.
 - Ktok: opencode's `step_finish` tokens or agy's `usage.total_tokens`, in thousands.
 - Fail fast: ping before real work. `opencode-worker` has DeepSeek's; for agy, `agy -p "Run the shell command echo pong and reply with just its output" --model gemini-4-neon-medium --mode accept-edits --print-timeout 60s < /dev/null` must print `pong`.
-- Neon out of quota: record its row with `blocker: env`, then ping Hydrogen (the same ping with `--model gemini-4-hydrogen-medium`) and run `hydrogen-medium` with the same task.
-- A tool that fails its ping, is out of quota or is not signed in (for Neon out of quota, once Hydrogen has failed too): record the row with `blocker: env` and route `--after` that tier (Neon and Hydrogen go to `sonnet-high`, DeepSeek to `haiku-medium`). This is the one `env` case that moves up a tier.
+- Every Gemini model except Argon draws on one shared agy quota (`agy -p /quota` shows it), so when Neon is out, Hydrogen is out too.
+- A tool that fails its ping, is out of quota or is not signed in: record the row with `blocker: env` and route `--after` that tier (Neon goes to `sonnet-high`, DeepSeek to `haiku-medium`). This is the one `env` case that moves up a tier.
 
 ## Escalation
 
