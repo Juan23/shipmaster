@@ -1,16 +1,16 @@
 ---
 name: attack-round
-description: Alongside each pr-reviewer round for a code change, run cheap read-only attackers (DeepSeek focuses + agy Gemini; agy alone on most later changes) on the committed branch, triage their findings, and fix the real ones.
+description: Alongside each merge-reviewer round for a code change, run cheap read-only attackers (DeepSeek focuses + agy Gemini; agy alone on most later changes) on the committed branch, triage their findings, and fix the real ones.
 ---
 
 # Attack round
 
-Owner's choice, 2026-11-19: cheap reviewers run **at the same time as** the pr-reviewer round, so the wait is the slower of the two, not their sum. Attackers never build, never run apps or emulators, and never replace a Claude review.
+Owner's choice, 2026-11-19: cheap reviewers run **at the same time as** the merge-reviewer round, so the wait is the slower of the two, not their sum. Attackers never build, never run apps or emulators, and never replace a Claude review.
 
 ## When
 
-- First change on a pull request: after the builder's own checks pass and the work is committed, start it in the background and spawn pr-reviewer round 1 at once.
-- Later changes on the same pull request: agy only (`--focus ""`), alongside that round's pr-reviewer. Add a DeepSeek focus only when the new commits touch sign-in, permissions, money, retries or concurrency.
+- First change on a pull request: after the builder's own checks pass and the work is committed, start it in the background and spawn merge-reviewer round 1 at once.
+- Later changes on the same pull request: agy only (`--focus ""`), alongside that round's merge-reviewer. Add a DeepSeek focus only when the new commits touch sign-in, permissions, money, retries or concurrency.
 - Skip it for wording, layout or colour changes, and for docs-only changes.
 - Pick only the focuses the change touches: `security` (sign-in, permissions, fail-open checks), `failure` (errors, offline, restarts), `timing` (races, stale state, expiry). agy always runs.
 
@@ -36,7 +36,7 @@ From the branch's checkout, as a background command (it ends within about 24 min
 One worker (type `audit`, tier from `worker-routing`) checks each finding against the code:
 - Keep it only if its scenario holds. Drop findings without a scenario.
 - For each kept finding, the builder writes the failing test it names (`/tdd`), then the fix. Charge it to the builder with `perf.py rework` (worker-routing).
-- The attack fixes and the same round's pr-reviewer fixes land as one commit. Never show the pr-reviewer the attack findings: it must not have seen the work.
+- The attack fixes and the same round's merge-reviewer fixes land as one commit. Never show the merge-reviewer the attack findings: it must not have seen the work.
 
 ## Why it stays
 

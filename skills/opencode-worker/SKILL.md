@@ -13,7 +13,7 @@ description: Run opencode (DeepSeek) headless, as the attack-round attackers, an
 |---|---|---|
 | Orchestrator | Claude (this session) | Splits the work, briefs the worker, watches it, checks its result. |
 | Attacker | DeepSeek via opencode | Reads a committed branch and reports findings, run by `attack-round.sh`. |
-| Reviewer | Claude | `/code-review` and `/commentdiet` before a PR opens; `/ponytail-review` on the PR. |
+| Reviewer | Claude | `/code-review` and `/ponytail-review` on the PR, before merge. |
 | Merger | Claude | Merges branches and PRs. |
 
 Reviews and merges never go to DeepSeek: reviews use the review agents in `worker-routing` rule 5, and `route` keeps merges on Claude.

@@ -37,7 +37,7 @@ Retired, never dispatched: `haiku-high`, `opus-low` (owner, 2026-11-02), `haiku-
 2. `perf.py route --type <type> --complexity <#.#>`. Add `--cycle` when a coding task ends in a staging or device run. It starts from a complexity floor, drops to a cheaper tier the log has **proven** on similar tasks, and steps over tiers the log shows **weak**.
 3. Spawn with `subagent_type` set to the routed tier, or run the shell command below for a non-Claude tier. Override it only with a reason the log can't see (for example, the task needs a device run the worker must design from scratch), and put that reason in the row's note. Give the worker an attempt cap for device runs.
 4. **Owner default at c5** (complexity ≥ 4.5; bug diagnosis, design, device runs and merges): spawn `sonnet-high` whatever `route` returns, and start the row's note with `owner-default c5:`. The owner set this on 2026-10-13. It does not cover coding and harness work, which `route` starts on `opus-medium`, or cleanup and audits, which start on agy.
-5. **Owner default for every PR review**: spawn `pr-reviewer` for a review before the PR is opened and `merge-reviewer` for a review of an open PR, whatever `route` returns, even at c5 (this rule overrides rule 4). Both run the current Opus model at high effort; record the row with `--model opus --effort high`, type `review`, and start its note with `owner-default review:`. The review gate accepts only these two agents, and one fixed reviewer makes the review rows a measure of that reviewer.
+5. **Owner default for every PR review**: spawn `merge-reviewer` on the open PR, whatever `route` returns, even at c5 (this rule overrides rule 4). It runs the current Opus model at high effort; record the row with `--model opus --effort high`, type `review`, and start its note with `owner-default review:`. The review gate accepts only this agent, and one fixed reviewer makes the review rows a measure of that reviewer.
 
 ## Non-Claude tiers
 
@@ -83,7 +83,7 @@ Done when `add` reports the appended row.
 
 **Rework** is a defect in a worker's accepted output, found later (review, screenshot check, device run), that forces another build or test cycle — a slight visual inconsistency counts. The owner's scarce resource is wall-clock time, and rework spends it, so `route` scores a reworked row 0.5 lower: a reworked pass ranks like a partial. A fix that needs no rebuild or retest (copy, comment) is not rework.
 
-Every real finding from the attack round, a pr-reviewer or a merge-reviewer that needs a code fix is rework: this is how the log judges each builder tier, so a weak default worker drops out of `route` by itself. When you find rework, charge it to the worker whose row produced it, before dispatching the fix:
+Every real finding from the attack round or a merge-reviewer that needs a code fix is rework: this is how the log judges each builder tier, so a weak default worker drops out of `route` by itself. When you find rework, charge it to the worker whose row produced it, before dispatching the fix:
 
 ```bash
 python3 ~/.claude/skills/worker-routing/perf.py rework --task "#88 capacity copy fix" --cycles 1 --wall-min 25 --note "one line: the defect and how it surfaced"
