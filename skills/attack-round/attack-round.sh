@@ -1,6 +1,6 @@
 #!/bin/bash
 # Attack round: cheap read-only reviewers (DeepSeek attackers + agy Gemini) on the committed branch,
-# alongside the Claude pr-reviewer. Finishes within twice the ping limit plus the time limit, with whatever arrived.
+# alongside the Claude merge-reviewer. Finishes within twice the ping limit plus the time limit, with whatever arrived.
 # Usage: attack-round.sh --base <ref> [--focus security,failure,timing] [--builder <tier>] [--out <dir>]
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
