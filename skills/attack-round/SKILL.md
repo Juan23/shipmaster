@@ -9,8 +9,8 @@ Owner's choice, 2026-11-19: cheap reviewers run **at the same time as** the merg
 
 ## When
 
-- First change on a pull request: after the builder's own checks pass and the work is committed, start it in the background and spawn merge-reviewer round 1 at once.
-- Later changes on the same pull request: agy only (`--focus ""`), alongside that round's merge-reviewer. Add a DeepSeek focus only when the new commits touch sign-in, permissions, money, retries or concurrency.
+- First change on a pull request: after the builder's own checks pass and the work is committed, pushed and its pull request opened, start it in the background and spawn merge-reviewer round 1 at once.
+- Later changes on the same pull request, once pushed: agy only (`--focus ""`), alongside that round's merge-reviewer. Add a DeepSeek focus only when the new commits touch sign-in, permissions, money, retries or concurrency.
 - Skip it for wording, layout or colour changes, and for docs-only changes.
 - Pick only the focuses the change touches: `security` (sign-in, permissions, fail-open checks), `failure` (errors, offline, restarts), `timing` (races, stale state, expiry). agy always runs.
 

@@ -27,7 +27,7 @@ Owner, 2026-11-21, from a three-model roundtable. `route` builds the ladder for 
 - A proposal for the owner's decision, not a rule, and `route` does not apply it: the roundtable of 2026-11-21 proposed that an agy tier passes the trial when at most 4 of its 20 tasks needed rework or stopped on agy's five-hour "Gemini Models" quota, and its pull requests needed no more review rounds than a Claude builder's. A tier that fails would do attacks and audits only. Check again at 40 tasks. A quota stop is an `env` row, which `stats` leaves out: count those from the log, beside the 20.
 - `sonnet-high` and DeepSeek do not build. DeepSeek is an attacker only (`attack-round`).
 - The agy tiers run from the shell (next section); the rest are agent types in `~/.claude/agents/`.
-- PR reviews use their own agents, not a tier (rule 5).
+- PR reviews use the merge-reviewer agent, not a tier (rule 5).
 
 Retired, never dispatched: `haiku-high`, `opus-low` (owner, 2026-11-02), `haiku-xhigh` (2026-10-22), `sonnet-medium` (2026-11-19), `hydrogen-medium` and `deepseek-high` (both 2026-11-21). `route --after` accepts a retired tier and steps above it. Old rows stay in `stats`.
 
